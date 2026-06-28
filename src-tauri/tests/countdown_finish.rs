@@ -4,19 +4,23 @@
 //! `countdown-tick`), never `Changed` (which turns into a full-page `reload`).
 
 use owlerlay_lib::countdown::dto::CountdownSnapshotDto;
-use owlerlay_lib::countdown::events::{AppEvent, finished_tick_events};
+use owlerlay_lib::countdown::events::{AppEvent, finished_tick_events, state_change_events};
 use owlerlay_lib::countdown::model::CountdownState;
 
-fn finished(id: u64, label: &str) -> CountdownSnapshotDto {
+fn snap(id: u64, label: &str, state: CountdownState, duration: u128) -> CountdownSnapshotDto {
     CountdownSnapshotDto {
         id,
         label: label.into(),
-        duration: 0,
+        duration,
         initial_duration: 60_000,
-        state: CountdownState::Finished,
+        state,
         start_epoch_ms: None,
         target_epoch_ms: None,
     }
+}
+
+fn finished(id: u64, label: &str) -> CountdownSnapshotDto {
+    snap(id, label, CountdownState::Finished, 0)
 }
 
 #[test]
@@ -54,5 +58,34 @@ fn unknown_finished_id_falls_back_to_empty_label() {
             assert_eq!(p.label, "");
         }
         _ => panic!("expected a single zero tick"),
+    }
+}
+
+#[test]
+fn start_emits_only_a_state_event() {
+    // Starting (-> Running) just un-hides via countdown-state; the ticker drives
+    // the value, so no tick and definitely no reload.
+    let events = state_change_events(&snap(1, "Intro", CountdownState::Running, 60_000));
+    match events.as_slice() {
+        [AppEvent::State(p)] => {
+            assert_eq!(p.id, 1);
+            assert_eq!(p.state, CountdownState::Running);
+        }
+        other => panic!("expected one State event, got {other:?}"),
+    }
+}
+
+#[test]
+fn reset_emits_state_plus_restored_value_tick() {
+    // Resetting (-> Idle) won't tick on its own, so it must also push a tick
+    // with the restored value (here the full 60s), never a reload.
+    let events = state_change_events(&snap(1, "Intro", CountdownState::Idle, 60_000));
+    match events.as_slice() {
+        [AppEvent::State(s), AppEvent::Tick(t)] => {
+            assert_eq!(s.state, CountdownState::Idle);
+            assert_eq!(t.id, 1);
+            assert_eq!(t.remaining_ms, 60_000, "tick must carry the restored value");
+        }
+        other => panic!("expected State + restored-value Tick, got {other:?}"),
     }
 }
