@@ -1,4 +1,5 @@
 use crate::countdown::dto::CountdownSnapshotDto;
+use crate::countdown::model::CountdownState;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -9,9 +10,18 @@ pub struct CountdownTickPayload {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct CountdownStatePayload {
+    pub id: u64,
+    pub state: CountdownState,
+}
+
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", content = "payload")]
 pub enum AppEvent {
     Tick(CountdownTickPayload),
+    /// A countdown's run-state changed (start/reset) without changing page
+    /// structure: overlays patch visibility in place instead of reloading.
+    State(CountdownStatePayload),
     Changed(Vec<CountdownSnapshotDto>),
     /// A group or overlay-config change: connected overlays should reload to
     /// pick up the freshly server-rendered page.
@@ -43,4 +53,24 @@ pub fn finished_tick_events(
             })
         })
         .collect()
+}
+
+/// Overlay updates for a countdown whose run-state changed without a structural
+/// change (start, reset). Always a [`AppEvent::State`] so overlays patch
+/// `hide_idle` visibility in place. A reset back to [`CountdownState::Idle`]
+/// also needs a [`AppEvent::Tick`] with the restored value, because an idle
+/// countdown never ticks and would otherwise keep its stale frozen frame.
+pub fn state_change_events(snap: &CountdownSnapshotDto) -> Vec<AppEvent> {
+    let mut events = vec![AppEvent::State(CountdownStatePayload {
+        id: snap.id,
+        state: snap.state,
+    })];
+    if snap.state == CountdownState::Idle {
+        events.push(AppEvent::Tick(CountdownTickPayload {
+            id: snap.id,
+            label: snap.label.clone(),
+            remaining_ms: snap.duration as u64,
+        }));
+    }
+    events
 }

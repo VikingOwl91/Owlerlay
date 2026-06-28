@@ -1,7 +1,9 @@
 use crate::app_state::AppState;
 use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::errors::CountdownError;
-use crate::countdown::events::{AppEvent, CountdownTickPayload, finished_tick_events};
+use crate::countdown::events::{
+    AppEvent, CountdownTickPayload, finished_tick_events, state_change_events,
+};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State, command};
 use tokio::time::Instant;
@@ -45,6 +47,24 @@ fn emit_changed(app: &AppHandle, state: &AppState, snapshots: Vec<CountdownSnaps
 /// browser sources reload the whole page and flash on stream.
 fn notify_desktop(app: &AppHandle, snapshots: &[CountdownSnapshotDto]) {
     let _ = app.emit("countdown_changed", snapshots);
+}
+
+/// Notify the desktop and patch overlays in place for a single countdown whose
+/// run-state changed (start/reset). Overlays update visibility (and, on reset,
+/// the restored value) via `countdown-state`/`countdown-tick` instead of a full
+/// page reload that would flash the OBS source.
+fn emit_state_change(
+    app: &AppHandle,
+    state: &AppState,
+    snapshots: &[CountdownSnapshotDto],
+    id: u64,
+) {
+    notify_desktop(app, snapshots);
+    if let Some(snap) = snapshots.iter().find(|s| s.id == id) {
+        for event in state_change_events(snap) {
+            let _ = state.event_bus.send(event);
+        }
+    }
 }
 
 #[command]
@@ -106,7 +126,7 @@ pub async fn countdown_start(
     let snapshots = build_snapshot_dtos(&state)
         .await
         .map_err(|e| e.to_string())?;
-    emit_changed(&app, &state, snapshots);
+    emit_state_change(&app, &state, &snapshots, id);
     Ok(())
 }
 
@@ -124,7 +144,7 @@ pub async fn countdown_reset(
     let snapshots = build_snapshot_dtos(&state)
         .await
         .map_err(|e| e.to_string())?;
-    emit_changed(&app, &state, snapshots);
+    emit_state_change(&app, &state, &snapshots, id);
     Ok(())
 }
 

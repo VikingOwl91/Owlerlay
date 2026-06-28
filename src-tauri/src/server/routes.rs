@@ -175,6 +175,12 @@ pub async fn sse_group(
                 .event("countdown-tick")
                 .data(data.to_string())))
         }
+        Ok(AppEvent::State(p)) if members.contains(&p.id) => {
+            let data = serde_json::json!({ "id": p.id, "state": p.state });
+            Some(Ok(Event::default()
+                .event("countdown-state")
+                .data(data.to_string())))
+        }
         Ok(AppEvent::Changed(snaps)) => snaps
             .iter()
             .any(|s| members.contains(&s.id))
