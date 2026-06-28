@@ -17,7 +17,10 @@ pub struct CountdownSnapshot {
     pub id: u64,
     pub label: String,
     pub state: CountdownState,
+    /// Remaining time at snapshot.
     pub duration: Duration,
+    /// Configured countdown length.
+    pub initial_duration: Duration,
     pub start_instant: Option<Instant>,
     pub target_instant: Option<Instant>,
 }
@@ -25,6 +28,12 @@ pub struct CountdownSnapshot {
 pub struct TickResult {
     pub still_running: Vec<(u64, String, Duration)>,
     pub newly_finished: Vec<u64>,
+}
+
+impl Default for CountdownService {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CountdownService {
@@ -72,11 +81,12 @@ impl CountdownService {
                 label: countdown.label().to_string(),
                 state: countdown.state(),
                 duration: countdown.remaining_at(now),
+                initial_duration: countdown.initial_duration(),
                 start_instant: countdown.start_timestamp(),
                 target_instant: countdown.target_timestamp(),
             })
         }
-        snapshots.sort_by(|a, b| a.id.cmp(&b.id));
+        snapshots.sort_by_key(|s| s.id);
         Ok(snapshots)
     }
 
@@ -104,6 +114,7 @@ impl CountdownService {
                 label: countdown.label().to_string(),
                 state: countdown.state(),
                 duration: countdown.remaining_at(now),
+                initial_duration: countdown.initial_duration(),
                 start_instant: countdown.start_timestamp(),
                 target_instant: countdown.target_timestamp(),
             })
@@ -159,10 +170,17 @@ impl CountdownService {
                 if countdown.is_finished() {
                     newly_finished.push(*id);
                 } else {
-                    still_running.push((*id, countdown.label().to_string(), countdown.remaining_at(now)));
+                    still_running.push((
+                        *id,
+                        countdown.label().to_string(),
+                        countdown.remaining_at(now),
+                    ));
                 }
             }
         }
-        TickResult { still_running, newly_finished }
+        TickResult {
+            still_running,
+            newly_finished,
+        }
     }
 }

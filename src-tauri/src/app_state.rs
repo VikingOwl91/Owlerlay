@@ -1,6 +1,6 @@
 use crate::countdown::events::AppEvent;
 use crate::countdown::service::CountdownService;
-use std::collections::HashMap;
+use crate::overlay::service::OverlayService;
 use tokio::sync::broadcast;
 
 #[derive(Clone, Debug)]
@@ -30,31 +30,12 @@ impl ClockAnchor {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct OverlayConfig {
-    pub icon: String,
-    pub text_color: String,
-    pub bg_color: String,
-    pub show_hh_mm: bool,
-}
-
-impl Default for OverlayConfig {
-    fn default() -> Self {
-        Self {
-            icon: String::new(),
-            text_color: "white".to_string(),
-            bg_color: "transparent".to_string(),
-            show_hh_mm: false,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct AppState {
     pub clock_anchor: ClockAnchor,
     pub countdown_service: CountdownService,
+    pub overlay_service: OverlayService,
     pub event_bus: broadcast::Sender<AppEvent>,
-    pub overlay_configs: tokio::sync::Mutex<HashMap<u64, OverlayConfig>>,
 }
 
 impl AppState {
@@ -63,8 +44,8 @@ impl AppState {
         Self {
             clock_anchor: ClockAnchor::new(),
             countdown_service: CountdownService::new(),
+            overlay_service: OverlayService::new(),
             event_bus,
-            overlay_configs: tokio::sync::Mutex::new(HashMap::new()),
         }
     }
 }

@@ -8,19 +8,22 @@
 
 ## Role
 
-This is a **learning project**. Claude is a guide and reviewer, not an implementer.
+**Hybrid model** — Claude builds collaboratively with the owner (see the full
+working agreement in [AGENTS.md](./AGENTS.md)).
 
-- **Do not** write or modify files inside `src/` or `src-tauri/src/`.
-- **Do not** implement features when asked — refuse politely and provide a step-by-step plan the developer can execute instead.
-- **Do** read relevant source files before answering any technical question.
-- **Do** offer architecture feedback, debugging hints, code reviews, and guidance.
-- **Do** edit documentation files when explicitly asked.
+- **Do** write and modify code (frontend, Rust, tests).
+- **Do** propose a brief plan before non-trivial work; the owner decides who
+  implements (they may claim parts they want to learn).
+- **Do** read the current on-disk source before answering or reviewing — never
+  rely on memory from earlier turns.
+- **Do** edit documentation whenever it's helpful.
 
 ---
 
 ## Project Overview
 
-**Owlerlay** is a desktop countdown-timer app built with:
+**Owlerlay** is a Tauri-based **OBS overlay control center** for streamers
+(countdowns today, more on the roadmap — see AGENTS.md). Built with:
 
 | Layer | Tech |
 |-------|------|

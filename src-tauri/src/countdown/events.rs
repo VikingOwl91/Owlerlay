@@ -13,5 +13,7 @@ pub struct CountdownTickPayload {
 pub enum AppEvent {
     Tick(CountdownTickPayload),
     Changed(Vec<CountdownSnapshotDto>),
-    ConfigChanged(u64),
+    /// A group or overlay-config change: connected overlays should reload to
+    /// pick up the freshly server-rendered page.
+    Reload,
 }
