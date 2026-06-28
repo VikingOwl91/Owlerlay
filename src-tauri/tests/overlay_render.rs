@@ -99,7 +99,10 @@ fn overlay_templates_render_under_strict_undefined() {
         .render(context! { content, source_style, script, layout => "column" })
         .expect("wrapper renders");
 
-    assert!(page.contains("countdown-1"), "renders the member's element id");
+    assert!(
+        page.contains("countdown-1"),
+        "renders the member's element id"
+    );
     assert!(
         page.contains("flex-direction: column"),
         "honours the group layout"

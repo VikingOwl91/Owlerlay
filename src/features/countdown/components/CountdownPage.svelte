@@ -30,15 +30,6 @@
   let overlaySettings = $state<Record<number, OverlaySettings>>({});
   let cleanup: (() => void) | null = null;
 
-  // Ensure every countdown has an editable settings entry.
-  $effect(() => {
-    for (const item of $countdownStore.items) {
-      if (!overlaySettings[item.id]) {
-        overlaySettings[item.id] = { ...DEFAULT_SETTINGS };
-      }
-    }
-  });
-
   function getSettings(id: number): OverlaySettings {
     return overlaySettings[id] ?? DEFAULT_SETTINGS;
   }

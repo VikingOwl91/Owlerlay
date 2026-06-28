@@ -68,8 +68,10 @@
     return `${OVERLAY_SERVER_ORIGIN}/overlay?group=${id}`;
   }
 
-  async function copyUrl(id: number) {
-    await navigator.clipboard.writeText(overlayUrl(id));
+  function copyUrl(id: number) {
+    navigator.clipboard
+      .writeText(overlayUrl(id))
+      .catch((error) => console.error(error));
   }
 
   onMount(() => {

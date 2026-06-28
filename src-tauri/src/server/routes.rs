@@ -145,7 +145,9 @@ pub async fn sse_group(
 
     // Cache each member's initial duration + time format at connect. Membership
     // and config changes emit a reload, so the client reconnects with fresh data.
-    let snapshots = build_snapshot_dtos(&state).await.unwrap_or_default();
+    let snapshots = build_snapshot_dtos(&state)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let initials: HashMap<u64, u128> = snapshots
         .iter()
         .filter(|s| members.contains(&s.id))
@@ -206,34 +208,38 @@ pub async fn list_icons() -> Json<Vec<String>> {
     Json(names)
 }
 
-/// Builds the overlay template environment. The templates are compiled into the
+/// The overlay template environment. The templates are compiled into the
 /// binary, so a parse failure here is a build-time bug, not a runtime condition.
-fn overlay_env() -> Environment<'static> {
-    let mut env = Environment::new();
-    // Surface missing context fields as render errors instead of silently
-    // emitting blanks — this is the drift that broke the overlay before.
-    env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
-    env.add_template(
-        "browsersource",
-        include_str!("../../templates/overlay/browsersource.html.j2"),
-    )
-    .expect("browsersource template should parse");
-    env.add_template(
-        "item_html",
-        include_str!("../../templates/overlay/countdown/countdown.html.j2"),
-    )
-    .expect("countdown html template should parse");
-    env.add_template(
-        "item_css",
-        include_str!("../../templates/overlay/countdown/countdown.css.j2"),
-    )
-    .expect("countdown css template should parse");
-    env.add_template(
-        "item_js",
-        include_str!("../../templates/overlay/countdown/countdown.js.j2"),
-    )
-    .expect("countdown js template should parse");
-    env
+/// Built once and cached — the templates never change between requests.
+fn overlay_env() -> &'static Environment<'static> {
+    static ENV: std::sync::OnceLock<Environment<'static>> = std::sync::OnceLock::new();
+    ENV.get_or_init(|| {
+        let mut env = Environment::new();
+        // Surface missing context fields as render errors instead of silently
+        // emitting blanks — this is the drift that broke the overlay before.
+        env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+        env.add_template(
+            "browsersource",
+            include_str!("../../templates/overlay/browsersource.html.j2"),
+        )
+        .expect("browsersource template should parse");
+        env.add_template(
+            "item_html",
+            include_str!("../../templates/overlay/countdown/countdown.html.j2"),
+        )
+        .expect("countdown html template should parse");
+        env.add_template(
+            "item_css",
+            include_str!("../../templates/overlay/countdown/countdown.css.j2"),
+        )
+        .expect("countdown css template should parse");
+        env.add_template(
+            "item_js",
+            include_str!("../../templates/overlay/countdown/countdown.js.j2"),
+        )
+        .expect("countdown js template should parse");
+        env
+    })
 }
 
 fn internal(e: minijinja::Error) -> (StatusCode, String) {
