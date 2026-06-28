@@ -1,7 +1,7 @@
 use crate::app_state::AppState;
 use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::errors::CountdownError;
-use crate::countdown::events::{AppEvent, CountdownTickPayload};
+use crate::countdown::events::{AppEvent, CountdownTickPayload, finished_tick_events};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State, command};
 use tokio::time::Instant;
@@ -205,7 +205,15 @@ pub(crate) fn spawn_ticker(app: AppHandle) {
             if !result.newly_finished.is_empty()
                 && let Ok(snapshots) = build_snapshot_dtos(&state).await
             {
-                emit_changed(&app, &state, snapshots);
+                // Desktop app: refresh the list so finished countdowns show
+                // their new state.
+                let _ = app.emit("countdown_changed", &snapshots);
+                // Overlays: push a final tick (remaining 0) per finished
+                // countdown instead of a reload, so OBS browser sources land on
+                // zero in place without flashing the source on stream.
+                for event in finished_tick_events(&result.newly_finished, &snapshots) {
+                    let _ = state.event_bus.send(event);
+                }
             }
         }
     });
