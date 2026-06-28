@@ -54,10 +54,26 @@ export type CountdownTickPayload = {
   remaining_ms: number;
 };
 
+/** Mirrors the Rust `OverlayConfig` struct (serde `camelCase`). */
+export type OverlayConfig = {
+  icon: string;
+  showTimer: boolean;
+  showProgress: boolean;
+  fontSize: number;
+  textColor: string;
+  background: string;
+  border: string;
+  borderRadius: number;
+  backdropFilter: boolean;
+  boxShadow: string;
+  iconSize: string;
+  dividerColor: string;
+  barBg: string;
+  barFg: string;
+  showHhMm: boolean;
+};
+
 export type OverlayConfigPayload = {
   id: number;
-  icon: string;
-  textColor: string;
-  bgColor: string;
-  showHhMm: boolean;
+  config: OverlayConfig;
 };
