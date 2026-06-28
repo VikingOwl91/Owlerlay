@@ -84,3 +84,9 @@ summary mark {
   flex: 1;
   font-size: 0.8rem;
 }
+
+/* Keep grouped buttons (e.g. "Add group") on one line so they match the
+   input's height instead of wrapping into a taller, two-line button. */
+[role="group"] button {
+  white-space: nowrap;
+}
