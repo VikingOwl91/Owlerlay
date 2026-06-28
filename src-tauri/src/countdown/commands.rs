@@ -37,6 +37,16 @@ fn emit_changed(app: &AppHandle, state: &AppState, snapshots: Vec<CountdownSnaps
     let _ = state.event_bus.send(AppEvent::Changed(snapshots));
 }
 
+/// Notify only the desktop UI of a state change, leaving overlays untouched.
+///
+/// Used for transitions that don't change what an overlay renders — pause and
+/// resume merely stop/restart the ticking timer, so the overlay keeps its
+/// current frame. Emitting [`AppEvent::Changed`] here would make connected OBS
+/// browser sources reload the whole page and flash on stream.
+fn notify_desktop(app: &AppHandle, snapshots: &[CountdownSnapshotDto]) {
+    let _ = app.emit("countdown_changed", snapshots);
+}
+
 #[command]
 pub async fn countdown_create(
     app: AppHandle,
@@ -132,7 +142,7 @@ pub async fn countdown_pause(
     let snapshots = build_snapshot_dtos(&state)
         .await
         .map_err(|e| e.to_string())?;
-    emit_changed(&app, &state, snapshots);
+    notify_desktop(&app, &snapshots);
     Ok(())
 }
 
@@ -150,7 +160,7 @@ pub async fn countdown_resume(
     let snapshots = build_snapshot_dtos(&state)
         .await
         .map_err(|e| e.to_string())?;
-    emit_changed(&app, &state, snapshots);
+    notify_desktop(&app, &snapshots);
     Ok(())
 }
 
