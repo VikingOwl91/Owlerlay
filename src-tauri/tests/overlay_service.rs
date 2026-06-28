@@ -1,5 +1,23 @@
-use owlerlay_lib::overlay::model::Layout;
+use owlerlay_lib::overlay::model::{Layout, OverlayConfig};
 use owlerlay_lib::overlay::service::OverlayService;
+
+#[test]
+fn overlay_config_deserializes_camel_case_and_defaults_missing_fields() {
+    // The frontend sends camelCase keys; a partial payload must fall back to
+    // per-field defaults (#[serde(rename_all = "camelCase", default)]).
+    let cfg: OverlayConfig = serde_json::from_str(
+        r##"{ "showProgress": true, "barFg": "#abcdef", "borderRadius": 12 }"##,
+    )
+    .expect("deserialize partial camelCase config");
+
+    assert!(cfg.show_progress);
+    assert_eq!(cfg.bar_fg, "#abcdef");
+    assert_eq!(cfg.border_radius, 12);
+    // Untouched fields keep their defaults.
+    assert!(cfg.show_timer);
+    assert_eq!(cfg.font_size, 2.0);
+    assert_eq!(cfg.background, "transparent");
+}
 
 #[tokio::test]
 async fn create_lists_groups_in_id_order() {

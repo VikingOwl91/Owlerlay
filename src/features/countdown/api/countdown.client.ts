@@ -2,7 +2,7 @@ import { invokeCommand } from "../../../shared/tauri/invoke";
 import type {
   CountdownCommand,
   CountdownPayload,
-  OverlayConfigPayload,
+  OverlayConfig,
   CountdownSnapshot,
   CountdownSnapshotDto,
 } from "../model/countdown.types";
@@ -69,17 +69,7 @@ export async function fetchCountdownSnapshot(
 
 export async function setOverlayConfig(
   id: number,
-  icon: string,
-  textColor: string,
-  bgColor: string,
-  showHhMm: boolean,
+  config: OverlayConfig,
 ): Promise<void> {
-  const payload: OverlayConfigPayload = {
-    id,
-    icon,
-    textColor,
-    bgColor,
-    showHhMm,
-  };
-  await invokeCommand<void>("set_overlay_config", payload);
+  await invokeCommand<void>("set_overlay_config", { id, config });
 }

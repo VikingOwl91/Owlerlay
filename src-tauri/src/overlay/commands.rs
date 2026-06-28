@@ -58,20 +58,8 @@ pub async fn group_delete(state: State<'_, Arc<AppState>>, id: u64) -> Result<()
 pub async fn set_overlay_config(
     state: State<'_, Arc<AppState>>,
     id: u64,
-    icon: String,
-    text_color: String,
-    bg_color: String,
-    show_hh_mm: bool,
+    config: OverlayConfig,
 ) -> Result<(), String> {
-    // ponytail: only icon/colors/hh:mm are user-set today; the richer template
-    // fields ride on OverlayConfig defaults until the styling UI lands (roadmap #1).
-    let config = OverlayConfig {
-        icon,
-        text_color,
-        background: bg_color,
-        show_hh_mm,
-        ..OverlayConfig::default()
-    };
     state.overlay_service.set_config(id, config).await;
     let _ = state.event_bus.send(AppEvent::Reload);
     Ok(())

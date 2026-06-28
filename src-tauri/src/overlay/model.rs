@@ -35,10 +35,10 @@ pub struct Group {
 /// Per-countdown overlay appearance. Every field the overlay templates reference
 /// lives here so rendering never sees an undefined variable.
 ///
-/// ponytail: only `icon` / `text_color` / `background` / `show_hh_mm` are set
-/// from the UI today; the rest ride on [`Default`] until the styling UI lands
-/// (roadmap #1 "polish countdown").
-#[derive(Debug, Clone)]
+/// Deserialized straight from the `set_overlay_config` payload; `#[serde(default)]`
+/// lets a partial payload fall back to [`Default`] field by field.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct OverlayConfig {
     pub icon: String,
     pub show_timer: bool,
