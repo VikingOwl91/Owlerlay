@@ -3,7 +3,7 @@ use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::errors::CountdownError;
 use crate::countdown::events::{AppEvent, CountdownTickPayload};
 use std::sync::Arc;
-use tauri::{command, AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, command};
 use tokio::time::Instant;
 
 pub(crate) async fn build_snapshot_dtos(
@@ -23,6 +23,7 @@ pub(crate) async fn build_snapshot_dtos(
                 id: s.id,
                 label: s.label,
                 duration: s.duration.as_millis(),
+                initial_duration: s.initial_duration.as_millis(),
                 state: s.state,
                 start_epoch_ms: start,
                 target_epoch_ms: target,
@@ -49,7 +50,9 @@ pub async fn countdown_create(
         .create_countdown(label, duration)
         .await
         .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state).await.map_err(|e| e.to_string())?;
+    let snapshots = build_snapshot_dtos(&state)
+        .await
+        .map_err(|e| e.to_string())?;
     emit_changed(&app, &state, snapshots);
     Ok(id)
 }
@@ -58,9 +61,7 @@ pub async fn countdown_create(
 pub async fn countdown_list(
     state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<CountdownSnapshotDto>, String> {
-    build_snapshot_dtos(&state)
-        .await
-        .map_err(|e| e.to_string())
+    build_snapshot_dtos(&state).await.map_err(|e| e.to_string())
 }
 
 #[command]
@@ -74,7 +75,9 @@ pub async fn countdown_delete(
         .delete_countdown(id)
         .await
         .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state).await.map_err(|e| e.to_string())?;
+    let snapshots = build_snapshot_dtos(&state)
+        .await
+        .map_err(|e| e.to_string())?;
     emit_changed(&app, &state, snapshots);
     Ok(())
 }
@@ -90,7 +93,9 @@ pub async fn countdown_start(
         .start(id, Instant::now())
         .await
         .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state).await.map_err(|e| e.to_string())?;
+    let snapshots = build_snapshot_dtos(&state)
+        .await
+        .map_err(|e| e.to_string())?;
     emit_changed(&app, &state, snapshots);
     Ok(())
 }
@@ -106,7 +111,9 @@ pub async fn countdown_reset(
         .reset(id)
         .await
         .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state).await.map_err(|e| e.to_string())?;
+    let snapshots = build_snapshot_dtos(&state)
+        .await
+        .map_err(|e| e.to_string())?;
     emit_changed(&app, &state, snapshots);
     Ok(())
 }
@@ -122,7 +129,9 @@ pub async fn countdown_pause(
         .pause(id, Instant::now())
         .await
         .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state).await.map_err(|e| e.to_string())?;
+    let snapshots = build_snapshot_dtos(&state)
+        .await
+        .map_err(|e| e.to_string())?;
     emit_changed(&app, &state, snapshots);
     Ok(())
 }
@@ -138,7 +147,9 @@ pub async fn countdown_resume(
         .resume(id, Instant::now())
         .await
         .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state).await.map_err(|e| e.to_string())?;
+    let snapshots = build_snapshot_dtos(&state)
+        .await
+        .map_err(|e| e.to_string())?;
     emit_changed(&app, &state, snapshots);
     Ok(())
 }
@@ -163,36 +174,11 @@ pub async fn countdown_snapshot(
         id: s.id,
         label: s.label,
         duration: s.duration.as_millis(),
+        initial_duration: s.initial_duration.as_millis(),
         state: s.state,
         start_epoch_ms: start,
         target_epoch_ms: target,
     })
-}
-
-#[command]
-pub async fn set_overlay_config(
-    state: State<'_, Arc<AppState>>,
-    id: u64,
-    icon: String,
-    text_color: String,
-    bg_color: String,
-    show_hh_mm: bool,
-) -> Result<(), String> {
-    state
-        .overlay_configs
-        .lock()
-        .await
-        .insert(
-            id,
-            crate::app_state::OverlayConfig {
-                icon,
-                text_color,
-                bg_color,
-                show_hh_mm,
-            },
-        );
-    let _ = state.event_bus.send(AppEvent::ConfigChanged(id));
-    Ok(())
 }
 
 pub(crate) fn spawn_ticker(app: AppHandle) {
@@ -204,7 +190,9 @@ pub(crate) fn spawn_ticker(app: AppHandle) {
             let now = tokio::time::Instant::now();
             let result = state.countdown_service.tick(now).await;
 
-            for (id, label, remaining) in result.still_running as Vec<(u64, String, tokio::time::Duration)> {
+            for (id, label, remaining) in
+                result.still_running as Vec<(u64, String, tokio::time::Duration)>
+            {
                 let payload = CountdownTickPayload {
                     id,
                     label,
@@ -214,10 +202,10 @@ pub(crate) fn spawn_ticker(app: AppHandle) {
                 let _ = state.event_bus.send(AppEvent::Tick(payload));
             }
 
-            if !result.newly_finished.is_empty() {
-                if let Ok(snapshots) = build_snapshot_dtos(&state).await {
-                    emit_changed(&app, &state, snapshots);
-                }
+            if !result.newly_finished.is_empty()
+                && let Ok(snapshots) = build_snapshot_dtos(&state).await
+            {
+                emit_changed(&app, &state, snapshots);
             }
         }
     });

@@ -36,6 +36,11 @@ impl Countdown {
         &self.label
     }
 
+    /// The configured countdown length, independent of how much time is left.
+    pub fn initial_duration(&self) -> Duration {
+        self.initial_duration
+    }
+
     pub fn state(&self) -> CountdownState {
         self.state
     }

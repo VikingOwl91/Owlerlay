@@ -36,6 +36,9 @@ importers:
       prettier-plugin-jinja-template:
         specifier: ^2.1.0
         version: 2.1.0(prettier@3.8.1)
+      prettier-plugin-svelte:
+        specifier: ^4.1.1
+        version: 4.1.1(prettier@3.8.1)(svelte@5.53.5)
       svelte:
         specifier: ^5.45.2
         version: 5.53.5
@@ -568,6 +571,13 @@ packages:
     peerDependencies:
       prettier: ^3.0.0
 
+  prettier-plugin-svelte@4.1.1:
+    resolution: {integrity: sha512-wXvbXMjSvb4C9ENWTHXyd+ihakKCsJ6rJhLP6/8HFNj4GkZr48jqL9PoKsl2sk7SyCZRTnJ7O2TTowUpOxP/KA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      prettier: ^3.0.0
+      svelte: ^5.0.0
+
   prettier@3.8.1:
     resolution: {integrity: sha512-UOnG6LftzbdaHZcKoPFtOcCKztrQ57WkHDeRD9t/PTQtmT0NHSeWWepj6pS0z/N7+08BHFDQVUrfmfMRcZwbMg==}
     engines: {node: '>=14'}
@@ -1012,6 +1022,11 @@ snapshots:
   prettier-plugin-jinja-template@2.1.0(prettier@3.8.1):
     dependencies:
       prettier: 3.8.1
+
+  prettier-plugin-svelte@4.1.1(prettier@3.8.1)(svelte@5.53.5):
+    dependencies:
+      prettier: 3.8.1
+      svelte: 5.53.5
 
   prettier@3.8.1: {}
 

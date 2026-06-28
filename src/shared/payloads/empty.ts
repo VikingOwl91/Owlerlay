@@ -1,1 +1,1 @@
-export type EmptyPayload = {}
+export type EmptyPayload = {};

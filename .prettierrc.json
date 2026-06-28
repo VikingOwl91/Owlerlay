@@ -1,6 +1,12 @@
 {
-  "plugins": ["prettier-plugin-jinja-template"],
+  "plugins": ["prettier-plugin-svelte", "prettier-plugin-jinja-template"],
   "overrides": [
+    {
+      "files": ["*.svelte"],
+      "options": {
+        "parser": "svelte"
+      }
+    },
     {
       "files": ["**/*.j2"],
       "options": {
