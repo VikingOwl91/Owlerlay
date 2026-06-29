@@ -1,7 +1,6 @@
-.countdown-item[data-hidden="true"] {
-    display: none;
-}
-#countdown-{{ c.id }}{
+/* Per-widget config, applied on top of the structural rules in
+   browsersource.html.j2. Every value here maps to a control-UI option. */
+#countdown-{{ c.id }} {
     background-color: {{ c.background }};
     border: {{ c.border }};
     border-radius: {{ c.border_radius }}px;
@@ -13,26 +12,20 @@
     box-shadow: {{ c.box_shadow }};
     {% endif %}
 }
-
 #timer-{{ c.id }} {
-  font-size: {{ c.font_size }}rem;
-  font-family: monospace;
-  color: {{ c.text_color }};
-  text-shadow: 2px 2px 4px black;
+    font-size: {{ c.font_size }}rem;
+    color: {{ c.text_color }};
 }
 #icon-{{ c.id }} {
-  width: {{ c.icon_size }};
-  height: {{ c.icon_size }};
-  vertical-align: middle;
-  margin-right: 0.5rem;
+    width: {{ c.icon_size }};
+    height: {{ c.icon_size }};
+}
+#divider-{{ c.id }} {
+    background-color: {{ c.divider_color }};
 }
 #progress-{{ c.id }} {
-  height: 0.6rem;
-  border-radius: 0.3rem;
-  overflow: hidden;
-  margin-top: 0.5rem;
+    background-color: {{ c.bar_bg }};
 }
 #progress-inner-{{ c.id }} {
-  height: 100%;
-  transition: width 0.2s linear;
+    background-color: {{ c.bar_fg }};
 }

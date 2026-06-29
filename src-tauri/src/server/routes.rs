@@ -7,7 +7,9 @@ use crate::overlay::model::OverlayConfig;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::http::header;
 use axum::response::Html;
+use axum::response::IntoResponse;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use minijinja::{Environment, Value, context};
 use serde::{Deserialize, Serialize};
@@ -78,7 +80,7 @@ impl CountdownView {
 pub async fn overlay_group(
     State(state): State<Arc<AppState>>,
     Query(q): Query<OverlayQuery>,
-) -> Result<Html<String>, (StatusCode, String)> {
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     let group = state.overlay_service.get_group(q.group).await.ok_or((
         StatusCode::NOT_FOUND,
         format!("overlay group {} not found", q.group),
@@ -126,7 +128,9 @@ pub async fn overlay_group(
         })
         .map_err(internal)?;
 
-    Ok(Html(html))
+    // No caching: a config/membership change fires a `reload`, and the browser
+    // must re-fetch the freshly rendered page instead of serving a stale copy.
+    Ok(([(header::CACHE_CONTROL, "no-store")], Html(html)))
 }
 
 /// Live updates for a group's countdowns. Emits `countdown-tick` (JSON

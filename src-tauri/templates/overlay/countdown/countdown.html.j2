@@ -3,33 +3,24 @@
   class="countdown-item"
   data-hidden="{{ hide_idle and c.state == 'Idle' }}"
 >
-  {% if c.icon %}
-    <img
-      id="icon-{{ c.id }}"
-      src="/static/icons/{{ c.icon }}"
-      alt="{{ c.name }}"
-    />
-  {% endif %}
-  {% if c.show_timer %}
-    <span
-      id="timer-{{ c.id }}"
-      style="font-size:{{ c.font_size }}rem; color:{{ c.text_color }}"
-    >
-      {{ c.remaining }}
-    </span>
-  {% endif %}
-  {% if c.show_timer and c.show_progress %}
-    <hr style="width: 100%; background-color: {{ c.divider_color }};" />
-  {% endif %}
-  {% if c.show_progress %}
-    <div
-      id="progress-{{ c.id }}"
-      style="width: 100%; background-color: {{ c.bar_bg }};"
-    >
-      <div
-        id="progress-inner-{{ c.id }}"
-        style="width: {{ c.percent }}%; background-color: {{ c.bar_fg }};"
-      ></div>
+  <div class="cd-stack">
+    {% if c.show_timer or c.icon %}
+    <div class="cd-readout">
+      {% if c.icon %}
+      <img id="icon-{{ c.id }}" class="cd-icon" src="/static/icons/{{ c.icon }}" alt="{{ c.name }}">
+      {% endif %}
+      {% if c.show_timer %}
+      <span id="timer-{{ c.id }}" class="cd-timer">{{ c.remaining }}</span>
+      {% endif %}
     </div>
-  {% endif %}
+    {% endif %}
+    {% if c.show_timer and c.show_progress %}
+    <hr id="divider-{{ c.id }}" class="cd-divider">
+    {% endif %}
+    {% if c.show_progress %}
+    <div id="progress-{{ c.id }}" class="cd-track">
+      <div id="progress-inner-{{ c.id }}" class="cd-fill" style="width: {{ c.percent }}%;"></div>
+    </div>
+    {% endif %}
+  </div>
 </div>
