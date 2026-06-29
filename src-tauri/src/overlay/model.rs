@@ -37,6 +37,29 @@ pub enum TimeFormat {
     S,
 }
 
+impl TimeFormat {
+    /// Render `ms` of remaining time per this format. Fixed-grouping modes let
+    /// the leading unit overflow (e.g. `MM:SS` of 2h is `120:00`); `Auto` strips
+    /// leading all-zero groups, padding the rest.
+    pub fn format(self, ms: u64) -> String {
+        let total = ms / 1_000;
+        let s = total % 60;
+        let m = (total / 60) % 60;
+        let h = (total / 3_600) % 24;
+        let d = total / 86_400;
+        match self {
+            TimeFormat::S => total.to_string(),
+            TimeFormat::Ms => format!("{:02}:{s:02}", total / 60),
+            TimeFormat::Hms => format!("{:02}:{m:02}:{s:02}", total / 3_600),
+            TimeFormat::Dhms => format!("{d:02}:{h:02}:{m:02}:{s:02}"),
+            TimeFormat::Auto if d > 0 => format!("{d:02}:{h:02}:{m:02}:{s:02}"),
+            TimeFormat::Auto if h > 0 => format!("{h:02}:{m:02}:{s:02}"),
+            TimeFormat::Auto if m > 0 => format!("{m:02}:{s:02}"),
+            TimeFormat::Auto => format!("{s:02}"),
+        }
+    }
+}
+
 /// A named group of countdowns rendered together as a single OBS browser source.
 ///
 /// Styling lives per countdown ([`OverlayConfig`]); the group only owns the
