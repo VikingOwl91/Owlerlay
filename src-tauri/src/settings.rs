@@ -20,18 +20,8 @@ pub struct RemoteConfig {
     pub remote_enabled: bool,
 }
 
-/// Resolve a file in the app config dir (`<app_config_dir>/<name>`). The single
-/// place the config-dir idiom lives — used here and by `countdown::store`.
-pub(crate) fn config_file(handle: &AppHandle, name: &str) -> io::Result<PathBuf> {
-    let dir = handle
-        .path()
-        .app_config_dir()
-        .map_err(|e| io::Error::other(e.to_string()))?;
-    Ok(dir.join(name))
-}
-
 /// Resolve a file in the app local-data dir (`<app_local_data_dir>/<name>`).
-/// The single place the data-dir idiom lives — used here and by
+/// The single place the data-dir idiom lives — shared by `token_path` here and
 /// `countdown::store`, so a future relocation of user data is a one-spot change.
 pub(crate) fn local_data_file(handle: &AppHandle, name: &str) -> io::Result<PathBuf> {
     let dir = handle
@@ -42,7 +32,11 @@ pub(crate) fn local_data_file(handle: &AppHandle, name: &str) -> io::Result<Path
 }
 
 fn config_path(handle: &AppHandle) -> io::Result<PathBuf> {
-    config_file(handle, "config.json")
+    let dir = handle
+        .path()
+        .app_config_dir()
+        .map_err(|e| io::Error::other(e.to_string()))?;
+    Ok(dir.join("config.json"))
 }
 
 fn token_path(handle: &AppHandle) -> io::Result<PathBuf> {

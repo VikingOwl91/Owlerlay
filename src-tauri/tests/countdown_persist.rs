@@ -151,6 +151,48 @@ async fn restore_dedups_duplicate_ids() {
 }
 
 #[tokio::test]
+async fn restore_clamps_paused_to_initial() {
+    // A corrupt Paused entry holding more than its configured length must be
+    // clamped, same invariant the Running arm enforces.
+    let dtos = vec![dto(1, CountdownState::Paused, INITIAL_MS * 5, None)];
+    let service = CountdownService::from_dtos(dtos, NOW_EPOCH_MS);
+    let s = &service.list_countdown().await.expect("list")[0];
+    assert_eq!(s.state, CountdownState::Paused);
+    assert!(
+        s.duration <= Duration::from_millis(INITIAL_MS as u64),
+        "paused remaining must be clamped to initial, got {:?}",
+        s.duration
+    );
+}
+
+#[tokio::test]
+async fn restore_drops_empty_label_entries() {
+    // create_countdown rejects empty labels; restore must not resurrect one.
+    let mut blank = dto(1, CountdownState::Idle, INITIAL_MS, None);
+    blank.label = String::new();
+    let good = dto(2, CountdownState::Idle, INITIAL_MS, None);
+    let service = CountdownService::from_dtos(vec![blank, good], NOW_EPOCH_MS);
+    let snaps = service.list_countdown().await.expect("list");
+    assert_eq!(snaps.len(), 1);
+    assert_eq!(snaps[0].id, 2);
+}
+
+#[tokio::test]
+async fn running_without_target_falls_back_to_stored_remaining() {
+    // A Running entry that lost its target_epoch_ms must resume from the stored
+    // remaining, not silently boot Finished.
+    let dtos = vec![dto(1, CountdownState::Running, 30_000, None)];
+    let service = CountdownService::from_dtos(dtos, NOW_EPOCH_MS);
+    let s = &service.list_countdown().await.expect("list")[0];
+    assert_eq!(s.state, CountdownState::Running);
+    assert!(
+        s.duration > Duration::from_secs(28) && s.duration <= Duration::from_secs(30),
+        "expected ~30s remaining, got {:?}",
+        s.duration
+    );
+}
+
+#[tokio::test]
 async fn empty_store_restores_empty_service() {
     let service = CountdownService::from_dtos(Vec::new(), NOW_EPOCH_MS);
     assert!(service.list_countdown().await.expect("list").is_empty());

@@ -53,6 +53,20 @@ impl Countdown {
         }
     }
 
+    /// Restore straight into the finished state (zero remaining, no timestamps)
+    /// — the single shape for "this countdown is already over", mirroring
+    /// `mark_finished`. Used by the restore path for finished/expired entries.
+    pub fn finished(label: impl Into<String>, initial_duration: Duration) -> Self {
+        Self::restore(
+            label,
+            initial_duration,
+            CountdownState::Finished,
+            Some(Duration::from_secs(0)),
+            None,
+            None,
+        )
+    }
+
     pub fn label(&self) -> &str {
         &self.label
     }
