@@ -24,6 +24,12 @@ importers:
         specifier: ^2
         version: 2.5.3
     devDependencies:
+      '@fontsource-variable/fraunces':
+        specifier: ^5.2.9
+        version: 5.2.9
+      '@fontsource-variable/quicksand':
+        specifier: ^5.2.10
+        version: 5.2.10
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.1
         version: 6.2.4(svelte@5.53.5)(vite@7.3.1(@types/node@24.10.15))
@@ -219,8 +225,14 @@ packages:
   '@fontsource-variable/bricolage-grotesque@5.2.10':
     resolution: {integrity: sha512-5EDsCqgGpKVcJWE4sg9ydli+t5WM97mISYw5lla/Ev4z71FwXh1oN0YUU8xjkRW9+wBCGD9R+ntAvI8G4bUFJg==}
 
+  '@fontsource-variable/fraunces@5.2.9':
+    resolution: {integrity: sha512-Y6IjunlN9Ni723np+GIgAaKzCDBrPRrqNi01TZxHs5wtHYROWFM9W6yiT+/gGwSjWIRD18oX17kD/BRWekc/Lw==}
+
   '@fontsource-variable/hanken-grotesk@5.2.8':
     resolution: {integrity: sha512-K7hu09ZKReBc7EifRLeM4K94NZBrxFEg0nGcISmVwlFQOJo4EmYkLXTWEwr5JcNW4z2hr5zy8vLS2sxC8JDmrQ==}
+
+  '@fontsource-variable/quicksand@5.2.10':
+    resolution: {integrity: sha512-1uzkzGDwWgtFnxquAXuD7fZV9wHkALb49UPzRXxGTVeeLsNrGnIU0O/pcz6m1U7RDtpHz2qx77JhCpKaq7FrUg==}
 
   '@fontsource-variable/spline-sans-mono@5.2.8':
     resolution: {integrity: sha512-Z1yYiEtP+8Gll5BJaR9dICK/ZTxoTWH+ZBH6rOTMWajPSOxwl7IZplkwX2J1QhMxqulhhdMrkRx6SkkLM+jLQw==}
@@ -769,7 +781,11 @@ snapshots:
 
   '@fontsource-variable/bricolage-grotesque@5.2.10': {}
 
+  '@fontsource-variable/fraunces@5.2.9': {}
+
   '@fontsource-variable/hanken-grotesk@5.2.8': {}
+
+  '@fontsource-variable/quicksand@5.2.10': {}
 
   '@fontsource-variable/spline-sans-mono@5.2.8': {}
 

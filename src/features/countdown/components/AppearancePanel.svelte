@@ -16,7 +16,7 @@
     mono: {
       label: "Mono · Tabular",
       stack:
-        'ui-monospace, "Spline Sans Mono", "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
+        '"Spline Sans Mono", ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
     },
     sans: {
       label: "Clean Sans",
@@ -35,7 +35,7 @@
     },
     serif: {
       label: "Serif",
-      stack: 'Georgia, "Playfair Display", "Times New Roman", serif',
+      stack: '"Fraunces", Georgia, "Times New Roman", serif',
     },
   } as const;
   type FontKey = keyof typeof FONTS;

@@ -3,12 +3,23 @@
   <head>
   <meta charset="UTF-8">
   <style>
+      /* Bundled timer fonts, served from public/ (/static), so every OBS
+         machine renders the chosen family identically regardless of what's
+         installed locally. Variable woff2 (weight axis) — one file per family
+         covers all weights. To add a face later: drop the woff2 in
+         public/fonts/, add an @font-face here, and a FONTS entry in the
+         control UI's AppearancePanel. */
+      @font-face { font-family: "Spline Sans Mono"; font-weight: 100 900; font-display: swap; src: url("/static/fonts/spline-sans-mono.woff2") format("woff2"); }
+      @font-face { font-family: "Hanken Grotesk"; font-weight: 100 900; font-display: swap; src: url("/static/fonts/hanken-grotesk.woff2") format("woff2"); }
+      @font-face { font-family: "Bricolage Grotesque"; font-weight: 200 800; font-display: swap; src: url("/static/fonts/bricolage-grotesque.woff2") format("woff2"); }
+      @font-face { font-family: "Quicksand"; font-weight: 300 700; font-display: swap; src: url("/static/fonts/quicksand.woff2") format("woff2"); }
+      @font-face { font-family: "Fraunces"; font-weight: 100 900; font-display: swap; src: url("/static/fonts/fraunces.woff2") format("woff2"); }
       body {
         background: transparent;
         margin: 0;
         padding: 0;
         overflow: hidden;
-        font-family: ui-monospace, "Spline Sans Mono", "JetBrains Mono",
+        font-family: "Spline Sans Mono", ui-monospace, "JetBrains Mono",
           "SF Mono", Menlo, Consolas, monospace;
       }
       /* Structural rules shared by every countdown; per-widget config (colours,
