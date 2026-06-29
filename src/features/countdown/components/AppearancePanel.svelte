@@ -9,36 +9,64 @@
   // UI-facing settings; a few fields are split out from the wire `OverlayConfig`
   // for friendlier controls (transparent toggle, border width+colour, shadow
   // on/off, icon/font size in rem). `toConfig` composes them back.
-  // Curated font choices. The overlay runs in OBS's browser, so each maps to a
-  // CSS stack with broad system fallbacks rather than a single (maybe missing)
-  // face. The control-room faces lead; fallbacks cover any OBS machine.
+  // Curated font choices. `stack` is the wire value sent to the overlay (clean
+  // family name → its bundled @font-face, then system fallbacks). `preview` is
+  // for the control-UI picker only: it leads with the "<Name> Variable" family
+  // that @fontsource registers here (see main.ts), so each option renders in
+  // its own face.
   const FONTS = {
     mono: {
-      label: "Spline Sans Mono · Mono",
+      name: "Spline Sans Mono",
+      kind: "Mono",
       stack:
         '"Spline Sans Mono", ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
+      preview: '"Spline Sans Mono Variable", ui-monospace, monospace',
     },
     sans: {
-      label: "Hanken Grotesk · Sans",
+      name: "Hanken Grotesk",
+      kind: "Sans",
       stack:
         '"Hanken Grotesk", "Inter", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif',
+      preview: '"Hanken Grotesk Variable", system-ui, sans-serif',
     },
     display: {
-      label: "Bricolage Grotesque · Display",
+      name: "Bricolage Grotesque",
+      kind: "Display",
       stack:
         '"Bricolage Grotesque", "Archivo Black", "Arial Black", Impact, system-ui, sans-serif',
+      preview: '"Bricolage Grotesque Variable", system-ui, sans-serif',
     },
     rounded: {
-      label: "Quicksand · Rounded",
+      name: "Quicksand",
+      kind: "Rounded",
       stack:
         '"Quicksand", "Varela Round", "Nunito", "SF Pro Rounded", system-ui, sans-serif',
+      preview: '"Quicksand Variable", system-ui, sans-serif',
     },
     serif: {
-      label: "Fraunces · Serif",
+      name: "Fraunces",
+      kind: "Serif",
       stack: '"Fraunces", Georgia, "Times New Roman", serif',
+      preview: '"Fraunces Variable", Georgia, serif',
     },
   } as const;
   type FontKey = keyof typeof FONTS;
+
+  let fontOpen = $state(false);
+
+  // Close the font picker on any click outside it (capture phase fires before
+  // the option's own onclick, so selecting still works).
+  function clickOutside(node: HTMLElement, onOut: () => void) {
+    const handler = (e: MouseEvent) => {
+      if (!node.contains(e.target as Node)) onOut();
+    };
+    document.addEventListener("click", handler, true);
+    return {
+      destroy() {
+        document.removeEventListener("click", handler, true);
+      },
+    };
+  }
 
   type OverlaySettings = {
     icon: string;
@@ -191,17 +219,44 @@
         />
       </div>
       <div class="field">
-        <label for="ap-fn">Font</label>
-        <select
-          id="ap-fn"
-          class="select"
-          value={s.font}
-          onchange={(e) => set({ font: e.currentTarget.value as FontKey })}
-        >
-          {#each Object.entries(FONTS) as [key, f] (key)}
-            <option value={key}>{f.label}</option>
-          {/each}
-        </select>
+        <span id="ap-fn" class="lbl">Font</span>
+        <div class="fontpick" use:clickOutside={() => (fontOpen = false)}>
+          <button
+            type="button"
+            class="fp-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={fontOpen}
+            aria-labelledby="ap-fn"
+            onclick={() => (fontOpen = !fontOpen)}
+          >
+            <span class="fp-name" style="font-family: {FONTS[s.font].preview}"
+              >{FONTS[s.font].name}</span
+            >
+            <span class="fp-chev" class:open={fontOpen}>▾</span>
+          </button>
+          {#if fontOpen}
+            <ul class="fp-list" role="listbox" aria-labelledby="ap-fn">
+              {#each Object.entries(FONTS) as [key, f] (key)}
+                <li role="option" aria-selected={s.font === key}>
+                  <button
+                    type="button"
+                    class="fp-opt"
+                    class:sel={s.font === key}
+                    onclick={() => {
+                      set({ font: key as FontKey });
+                      fontOpen = false;
+                    }}
+                  >
+                    <span class="fp-opt-name" style="font-family: {f.preview}"
+                      >{f.name}</span
+                    >
+                    <span class="fp-opt-kind">{f.kind}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
       </div>
       <div class="field">
         <label for="ap-fs">Font size</label>
@@ -502,13 +557,88 @@
     text-align: center;
   }
 
-  .select {
+  .lbl {
+    color: var(--dim);
     font-size: 13.5px;
+  }
+
+  .fontpick {
+    position: relative;
+  }
+  .fp-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 170px;
     background: var(--ink);
     border: 1px solid var(--haze-soft);
     border-radius: 8px;
     padding: 6px 10px;
     color: var(--moon);
     cursor: pointer;
+    text-align: left;
+  }
+  .fp-name {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fp-chev {
+    color: var(--dim);
+    font-size: 11px;
+    transition: transform 0.15s;
+  }
+  .fp-chev.open {
+    transform: rotate(180deg);
+  }
+
+  .fp-list {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 220px;
+    margin: 0;
+    padding: 5px;
+    list-style: none;
+    background: var(--ink-card);
+    border: 1px solid var(--haze-soft);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+  .fp-opt {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--moon);
+    cursor: pointer;
+    text-align: left;
+  }
+  .fp-opt:hover {
+    background: var(--haze-soft);
+  }
+  .fp-opt.sel {
+    background: var(--haze);
+  }
+  .fp-opt-name {
+    font-size: 17px;
+    line-height: 1.2;
+  }
+  .fp-opt-kind {
+    flex: none;
+    color: var(--dimmer);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 </style>
