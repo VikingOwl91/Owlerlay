@@ -5,7 +5,7 @@
 
 use owlerlay_lib::countdown::dto::CountdownSnapshotDto;
 use owlerlay_lib::countdown::model::CountdownState;
-use owlerlay_lib::countdown::service::CountdownService;
+use owlerlay_lib::countdown::service::{CountdownService, MAX_COUNTDOWNS};
 use tokio::time::Duration;
 
 const NOW_EPOCH_MS: u128 = 1_700_000_000_000;
@@ -123,13 +123,16 @@ async fn next_id_does_not_overflow_on_max_id() {
 
 #[tokio::test]
 async fn restore_caps_at_max_countdowns() {
-    // A corrupt/hand-edited store with more than the create limit (10) must not
-    // load more timers than the app expects.
-    let dtos: Vec<_> = (0..15)
+    // A corrupt/hand-edited store with more than the create limit must not load
+    // more timers than the app expects.
+    let dtos: Vec<_> = (0..MAX_COUNTDOWNS as u64 + 5)
         .map(|id| dto(id, CountdownState::Idle, INITIAL_MS, None))
         .collect();
     let service = CountdownService::from_dtos(dtos, NOW_EPOCH_MS);
-    assert_eq!(service.list_countdown().await.expect("list").len(), 10);
+    assert_eq!(
+        service.list_countdown().await.expect("list").len(),
+        MAX_COUNTDOWNS
+    );
 }
 
 #[tokio::test]

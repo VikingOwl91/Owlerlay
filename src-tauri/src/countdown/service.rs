@@ -5,7 +5,11 @@ use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
-const MAX_COUNTDOWNS: usize = 10;
+/// Upper bound on live countdowns — a sanity guardrail, not a hard limit: it
+/// stops runaway/accidental creation and keeps the control rail manageable.
+/// Raising it is cheap, but the ticker emits one event per running countdown
+/// every 100ms, so the event-bus buffer in `AppState::new` is sized off this.
+pub const MAX_COUNTDOWNS: usize = 64;
 
 #[derive(Debug)]
 pub struct CountdownService {

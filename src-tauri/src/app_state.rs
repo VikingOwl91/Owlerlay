@@ -56,7 +56,10 @@ impl AppState {
         remote_token: String,
         persisted: Vec<CountdownSnapshotDto>,
     ) -> Self {
-        let (event_bus, _) = broadcast::channel(64);
+        // The ticker emits up to one event per running countdown every 100ms, so
+        // size the buffer off the cap (×4 ≈ a few cycles of headroom) — keeps a
+        // briefly-slow SSE client from lagging out of the broadcast.
+        let (event_bus, _) = broadcast::channel(crate::countdown::service::MAX_COUNTDOWNS * 4);
         // Anchor first, then restore countdowns against its boot wall-clock so
         // running timers keep counting across the restart.
         let clock_anchor = ClockAnchor::new();
