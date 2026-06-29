@@ -9,9 +9,41 @@
   // UI-facing settings; a few fields are split out from the wire `OverlayConfig`
   // for friendlier controls (transparent toggle, border width+colour, shadow
   // on/off, icon/font size in rem). `toConfig` composes them back.
+  // Curated font choices. The overlay runs in OBS's browser, so each maps to a
+  // CSS stack with broad system fallbacks rather than a single (maybe missing)
+  // face. The control-room faces lead; fallbacks cover any OBS machine.
+  const FONTS = {
+    mono: {
+      label: "Mono · Tabular",
+      stack:
+        'ui-monospace, "Spline Sans Mono", "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
+    },
+    sans: {
+      label: "Clean Sans",
+      stack:
+        '"Hanken Grotesk", "Inter", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif',
+    },
+    display: {
+      label: "Bold Display",
+      stack:
+        '"Bricolage Grotesque", "Archivo Black", "Arial Black", Impact, system-ui, sans-serif',
+    },
+    rounded: {
+      label: "Rounded",
+      stack:
+        '"Quicksand", "Varela Round", "Nunito", "SF Pro Rounded", system-ui, sans-serif',
+    },
+    serif: {
+      label: "Serif",
+      stack: 'Georgia, "Playfair Display", "Times New Roman", serif',
+    },
+  } as const;
+  type FontKey = keyof typeof FONTS;
+
   type OverlaySettings = {
     icon: string;
     showTimer: boolean;
+    font: FontKey;
     fontSize: number;
     textColor: string;
     iconSize: number;
@@ -32,6 +64,7 @@
   const DEFAULT_SETTINGS: OverlaySettings = {
     icon: "",
     showTimer: true,
+    font: "mono",
     fontSize: 2,
     textColor: "#ffffff",
     iconSize: 2,
@@ -55,6 +88,7 @@
       showTimer: s.showTimer,
       showProgress: s.showProgress,
       fontSize: s.fontSize,
+      fontFamily: FONTS[s.font].stack,
       textColor: s.textColor,
       background: s.bgTransparent ? "transparent" : s.bgColor,
       border:
@@ -155,6 +189,19 @@
           value={s.textColor}
           onchange={(e) => set({ textColor: e.currentTarget.value })}
         />
+      </div>
+      <div class="field">
+        <label for="ap-fn">Font</label>
+        <select
+          id="ap-fn"
+          class="select"
+          value={s.font}
+          onchange={(e) => set({ font: e.currentTarget.value as FontKey })}
+        >
+          {#each Object.entries(FONTS) as [key, f] (key)}
+            <option value={key}>{f.label}</option>
+          {/each}
+        </select>
       </div>
       <div class="field">
         <label for="ap-fs">Font size</label>
@@ -453,5 +500,15 @@
     color: var(--moon);
     width: 72px;
     text-align: center;
+  }
+
+  .select {
+    font-size: 13.5px;
+    background: var(--ink);
+    border: 1px solid var(--haze-soft);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--moon);
+    cursor: pointer;
   }
 </style>

@@ -61,6 +61,7 @@ export type OverlayConfig = {
   showTimer: boolean;
   showProgress: boolean;
   fontSize: number;
+  fontFamily: string;
   textColor: string;
   background: string;
   border: string;

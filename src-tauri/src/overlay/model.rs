@@ -45,6 +45,9 @@ pub struct OverlayConfig {
     pub show_progress: bool,
     /// Timer font size, in `rem`.
     pub font_size: f32,
+    /// CSS `font-family` stack for the timer. `"inherit"` keeps the page's
+    /// default mono face; the control UI sends a curated stack per widget.
+    pub font_family: String,
     pub text_color: String,
     pub background: String,
     pub border: String,
@@ -67,6 +70,7 @@ impl Default for OverlayConfig {
             show_timer: true,
             show_progress: false,
             font_size: 2.0,
+            font_family: "inherit".to_string(),
             text_color: "white".to_string(),
             background: "transparent".to_string(),
             border: "none".to_string(),
