@@ -60,11 +60,15 @@ Ordered, near-term first:
    existing `CountdownService` plus a small mobile-friendly page. Decide HTTP
    write-access scoping/auth when scoping (today the server is read-only,
    CORS allows any origin).
-3. **Alarms / scheduled events** — time-of-day triggers, not just countdowns.
-4. **Twitch integration** — react to Twitch events (subs/follows/points) to drive
+3. **Widget storage / persistence** — persist countdowns (and overlay config)
+   across restarts. State lives in its *own* file (NOT the remote config file);
+   requires serializing the running state machine and restoring `Instant`s via the
+   `ClockAnchor` on boot. Reuses the config-dir plumbing from item 2.
+4. **Alarms / scheduled events** — time-of-day triggers, not just countdowns.
+5. **Twitch integration** — react to Twitch events (subs/follows/points) to drive
    overlays and timers.
-5. **Alerts / notifications** — on-screen alert overlays for OBS (e.g. new follower).
-6. **Companion (avatar)** — scope TBD, next-up not now. Basis is the proof at
+6. **Alerts / notifications** — on-screen alert overlays for OBS (e.g. new follower).
+7. **Companion (avatar)** — scope TBD, next-up not now. Basis is the proof at
    `~/Dev/3D_Models/AndreIsohedronCephalon/`: a Three.js audio-reactive 3D avatar
    with in-browser Kokoro TTS. Becomes a responsive companion for voice/alert
    animations.
@@ -133,9 +137,10 @@ screenshots/recordings for UI changes, and the exact verification commands run.
 ## Known cleanup backlog
 Tracked, not yet done (fix opportunistically):
 - About page is a one-line stub (`src/app/shell/AppShell.svelte`).
-- Overlay server origin is centralized in `src/shared/overlay/origin.ts` but
-  still hardcoded to `localhost:7420` — make it env/settings-configurable (needed
-  for LAN remote control, roadmap item 2).
+- Overlay server origin (`src/shared/overlay/origin.ts`) is hardcoded to
+  `localhost:7420`. This is correct: it's only used by the desktop control UI
+  talking to its own machine. The LAN remote is a separate page the backend
+  serves with relative URLs, so this does *not* need to be configurable.
 - Overlay config gap: `set_overlay_config` stores only icon/colors/HH:MM while
   `OverlayConfig` (and the templates) support progress bars, fonts, dividers,
   borders, etc. — wiring these to the UI is roadmap item 1.

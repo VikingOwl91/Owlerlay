@@ -46,6 +46,25 @@ panel, and the chosen look is baked into the served page:
 Styling is served with `Cache-Control: no-store`, so a config change re-renders
 the page instantly without a manual cache-bypassing reload.
 
+## Phone remote (LAN)
+
+Control your timers from a phone or tablet on the same network while you're on
+camera. It's **off by default** — open the gear menu (top-right), enable
+**Phone remote**, and restart the app. Owlerlay then shows a QR code; scan it to
+open a mobile control page with start / pause / resume / reset for every
+countdown. Changes sync live to both the desktop panel and your OBS overlay.
+
+Security model:
+
+- **Opt-in binding** — disabled, the server stays on `127.0.0.1` (nothing on the
+  LAN). Enabled, it binds `0.0.0.0:7420` at startup.
+- **Capability token** — the QR encodes `…/remote?t=<token>`; every control
+  request must carry that token (read/overlay routes stay open for OBS). The
+  token is a 256-bit secret stored **outside** the trackable config (so it's
+  safe to sync `config.json` with chezmoi et al.). "Regenerate token" revokes
+  every existing link.
+- Anyone with the link can drive your timers — keep it to your own devices.
+
 ## Development
 
 ```bash
@@ -67,19 +86,23 @@ cargo fmt   --manifest-path src-tauri/Cargo.toml
 |------|---------|
 | `src/features/countdown/` | Countdown UI (api / model / state / components) |
 | `src/features/overlay/` | Overlay-group manager UI |
+| `src/features/remote/` | Phone-remote settings UI + QR |
 | `src/app/` | App shell + the Night-Owl design tokens (`styles/`) |
 | `src-tauri/src/countdown/` | Countdown state machine, service, Tauri commands |
 | `src-tauri/src/overlay/` | Overlay groups + per-countdown config, commands |
-| `src-tauri/src/server/` | Axum overlay/SSE server |
+| `src-tauri/src/server/` | Axum overlay/SSE server (`remote.rs` = LAN control API) |
+| `src-tauri/src/settings.rs` | Persisted remote config + capability token |
+| `src-tauri/src/remote.rs` | Phone-remote Tauri commands (QR URL, enable, regenerate) |
 | `src-tauri/templates/overlay/` | Jinja2 overlay templates |
+| `src-tauri/templates/remote/` | Static mobile control page |
 | `public/fonts/` | Self-hosted widget fonts (served at `/static/fonts/`) |
 
 ## Roadmap
 
-Polish countdown styling is **done**. Next up: **LAN remote control** (drive
-timers from a phone on the same network), then alarms, Twitch integration,
-alerts, and a companion avatar. The full ordered roadmap and collaboration rules
-live in [AGENTS.md](./AGENTS.md).
+Countdown styling and **LAN remote control** are **done**. Next up: **widget
+storage / persistence** (timers surviving a restart), then alarms, Twitch
+integration, alerts, and a companion avatar. The full ordered roadmap and
+collaboration rules live in [AGENTS.md](./AGENTS.md).
 
 ## Contributing
 

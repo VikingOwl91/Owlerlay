@@ -30,6 +30,9 @@
   function startCreate() {
     subject = "create";
   }
+  function openSettings() {
+    subject = "settings";
+  }
   function finishCreate() {
     subject = "countdown"; // the store auto-selects the new countdown
   }
@@ -58,6 +61,33 @@
     {#if liveCount > 0}
       <span class="livepill"><span class="dot"></span>{liveCount} live</span>
     {/if}
+    <button
+      type="button"
+      class="gear"
+      class:active={subject === "settings"}
+      onclick={openSettings}
+      aria-label="Phone remote settings"
+      title="Phone remote"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
+        <path
+          d="M19.4 13a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
+      </svg>
+    </button>
   </header>
 
   <Roost
@@ -136,6 +166,27 @@
     background: var(--eye);
     box-shadow: var(--glow);
     animation: owl-pulse 2s ease-in-out infinite;
+  }
+  .gear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-input);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+  }
+  .gear:hover {
+    color: var(--moon);
+    background: var(--haze-soft);
+  }
+  .gear.active {
+    color: var(--eye);
+    border-color: var(--haze);
+    background: var(--ink-card);
   }
   @media (max-width: 720px) {
     .tagline {

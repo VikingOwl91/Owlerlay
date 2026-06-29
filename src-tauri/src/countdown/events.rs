@@ -19,8 +19,9 @@ pub struct CountdownStatePayload {
 #[serde(tag = "type", content = "payload")]
 pub enum AppEvent {
     Tick(CountdownTickPayload),
-    /// A countdown's run-state changed (start/reset) without changing page
-    /// structure: overlays patch visibility in place instead of reloading.
+    /// A countdown's run-state changed (start/pause/resume/reset/finish) without
+    /// changing page structure: overlays patch visibility in place instead of
+    /// reloading, and SSE-only clients (the phone remote) learn the new state.
     State(CountdownStatePayload),
     Changed(Vec<CountdownSnapshotDto>),
     /// A group or overlay-config change: connected overlays should reload to
@@ -28,29 +29,37 @@ pub enum AppEvent {
     Reload,
 }
 
-/// Final overlay updates for countdowns that just reached zero.
+/// Final updates for countdowns that just reached zero.
 ///
-/// Reaching zero is visually only "timer → 0", which a [`AppEvent::Tick`] with
-/// `remaining_ms: 0` conveys in place. Emitting [`AppEvent::Changed`] here
-/// instead would make every connected OBS browser source reload the whole page
-/// — a visible flash on stream each time a timer finishes.
-pub fn finished_tick_events(
+/// For OBS overlays, reaching zero is visually only "timer → 0", which a
+/// [`AppEvent::Tick`] with `remaining_ms: 0` conveys in place (emitting
+/// [`AppEvent::Changed`] would reload the whole page and flash on stream). The
+/// accompanying [`AppEvent::State`] is what tells SSE-only clients like the
+/// phone remote that the run-state is now `Finished` — overlays ignore it for
+/// any non-idle state, so it costs them nothing.
+pub fn finished_events(
     newly_finished: &[u64],
     snapshots: &[CountdownSnapshotDto],
 ) -> Vec<AppEvent> {
     newly_finished
         .iter()
-        .map(|id| {
+        .flat_map(|id| {
             let label = snapshots
                 .iter()
                 .find(|s| s.id == *id)
                 .map(|s| s.label.clone())
                 .unwrap_or_default();
-            AppEvent::Tick(CountdownTickPayload {
-                id: *id,
-                label,
-                remaining_ms: 0,
-            })
+            [
+                AppEvent::Tick(CountdownTickPayload {
+                    id: *id,
+                    label,
+                    remaining_ms: 0,
+                }),
+                AppEvent::State(CountdownStatePayload {
+                    id: *id,
+                    state: CountdownState::Finished,
+                }),
+            ]
         })
         .collect()
 }

@@ -267,4 +267,3 @@ fn percent_of(remaining_ms: u128, initial_ms: u128) -> f32 {
         (remaining_ms as f32 / initial_ms as f32) * 100.0
     }
 }
-
