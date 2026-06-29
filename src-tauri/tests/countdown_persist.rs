@@ -122,6 +122,32 @@ async fn next_id_does_not_overflow_on_max_id() {
 }
 
 #[tokio::test]
+async fn restore_caps_at_max_countdowns() {
+    // A corrupt/hand-edited store with more than the create limit (10) must not
+    // load more timers than the app expects.
+    let dtos: Vec<_> = (0..15)
+        .map(|id| dto(id, CountdownState::Idle, INITIAL_MS, None))
+        .collect();
+    let service = CountdownService::from_dtos(dtos, NOW_EPOCH_MS);
+    assert_eq!(service.list_countdown().await.expect("list").len(), 10);
+}
+
+#[tokio::test]
+async fn restore_dedups_duplicate_ids() {
+    // Two entries sharing an id must collapse to one deterministically (first
+    // wins), never silently lose a timer in HashMap order.
+    let mut a = dto(7, CountdownState::Idle, INITIAL_MS, None);
+    a.label = "first".into();
+    let mut b = dto(7, CountdownState::Paused, 7_000, None);
+    b.label = "second".into();
+    let service = CountdownService::from_dtos(vec![a, b], NOW_EPOCH_MS);
+    let snaps = service.list_countdown().await.expect("list");
+    assert_eq!(snaps.len(), 1);
+    assert_eq!(snaps[0].label, "first");
+    assert_eq!(snaps[0].state, CountdownState::Idle);
+}
+
+#[tokio::test]
 async fn empty_store_restores_empty_service() {
     let service = CountdownService::from_dtos(Vec::new(), NOW_EPOCH_MS);
     assert!(service.list_countdown().await.expect("list").is_empty());

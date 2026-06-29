@@ -118,9 +118,20 @@ impl CountdownService {
             .map(|d| d.id)
             .max()
             .map_or(0, |m| m.saturating_add(1));
-        let mut countdowns = HashMap::with_capacity(dtos.len());
+        let mut countdowns = HashMap::with_capacity(dtos.len().min(MAX_COUNTDOWNS));
         for dto in dtos {
-            countdowns.insert(dto.id, restore_countdown(dto, now, now_epoch_ms));
+            // Defend against a corrupt/hand-edited store: cap at the same limit
+            // create_countdown enforces (so the ticker/overlay can't be handed
+            // more timers than the app expects), and keep the first entry per id
+            // (a duplicate id must not silently drop a timer in nondeterministic
+            // HashMap order). next_id is still derived from the full id range
+            // above, so it can't collide with a retained entry.
+            if countdowns.len() >= MAX_COUNTDOWNS {
+                break;
+            }
+            countdowns
+                .entry(dto.id)
+                .or_insert_with(|| restore_countdown(dto, now, now_epoch_ms));
         }
         Self {
             countdowns: Mutex::new(countdowns),

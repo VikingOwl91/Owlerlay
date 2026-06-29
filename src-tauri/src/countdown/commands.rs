@@ -38,7 +38,7 @@ pub(crate) async fn build_snapshot_dtos(
 }
 
 fn emit_changed(app: &AppHandle, state: &AppState, snapshots: Vec<CountdownSnapshotDto>) {
-    let _ = crate::countdown::store::save(app, &snapshots);
+    crate::countdown::store::save(app, &snapshots);
     let _ = app.emit("countdown_changed", &snapshots);
     let _ = state.event_bus.send(AppEvent::Changed(snapshots));
 }
@@ -61,7 +61,7 @@ fn emit_state_change(
     snapshots: &[CountdownSnapshotDto],
     id: u64,
 ) {
-    let _ = crate::countdown::store::save(app, snapshots);
+    crate::countdown::store::save(app, snapshots);
     notify_desktop(app, snapshots);
     if let Some(snap) = snapshots.iter().find(|s| s.id == id) {
         for event in state_change_events(snap) {
@@ -242,7 +242,7 @@ pub(crate) fn spawn_ticker(app: AppHandle) {
                 // Persist the natural finish: this is the one state transition
                 // not driven by a user action, so without this the store keeps
                 // a stale `Running` entry until the next mutation.
-                let _ = crate::countdown::store::save(&app, &snapshots);
+                crate::countdown::store::save(&app, &snapshots);
                 // Desktop app: refresh the list so finished countdowns show
                 // their new state.
                 let _ = app.emit("countdown_changed", &snapshots);
