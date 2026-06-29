@@ -7,8 +7,6 @@
 //! `next_id` isn't stored: it's derived as `max(id)+1` on restore.
 
 use std::io;
-use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use tauri::AppHandle;
 
@@ -41,9 +39,10 @@ pub fn load(handle: &AppHandle) -> Vec<CountdownSnapshotDto> {
 }
 
 /// Persist the current countdowns. Fire-and-forget: the (tiny) serialize runs
-/// on the caller, then the blocking disk write is handed to a blocking thread so
-/// it never stalls the async runtime that drives the 100ms ticker and the
-/// LAN-remote SSE stream. Errors are dropped — every call site is best-effort.
+/// on the caller, then the blocking disk write (atomic — see
+/// [`crate::settings::write_atomic`]) is handed to a blocking thread so it never
+/// stalls the async runtime that drives the 100ms ticker and the LAN-remote SSE
+/// stream. Errors are dropped — every call site is best-effort.
 pub fn save(handle: &AppHandle, snapshots: &[CountdownSnapshotDto]) {
     let Ok(path) = store_path(handle) else {
         return;
@@ -52,27 +51,6 @@ pub fn save(handle: &AppHandle, snapshots: &[CountdownSnapshotDto]) {
         return;
     };
     tauri::async_runtime::spawn_blocking(move || {
-        let _ = write_atomic(&path, &json);
+        let _ = crate::settings::write_atomic(&path, &json, None);
     });
-}
-
-/// Write `json` to `path` atomically: a *unique* sibling temp file then a rename
-/// (atomic on the same filesystem), so a concurrent save (desktop IPC + LAN
-/// remote) or a crash mid-write can never leave a half-written file that
-/// `load()` discards. The per-write sequence keeps the two writers off each
-/// other's temp file; on failure the temp is cleaned up so it can't accumulate.
-fn write_atomic(path: &Path, json: &str) -> io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    static SAVE_SEQ: AtomicU64 = AtomicU64::new(0);
-    let seq = SAVE_SEQ.fetch_add(1, Ordering::Relaxed);
-    let tmp = path.with_extension(format!("json.tmp.{seq}"));
-    match std::fs::write(&tmp, json).and_then(|()| std::fs::rename(&tmp, path)) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            let _ = std::fs::remove_file(&tmp);
-            Err(e)
-        }
-    }
 }

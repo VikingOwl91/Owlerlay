@@ -8,10 +8,41 @@
 //!     kept out of the tracked config.
 
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
+
+/// Write `contents` to `path` atomically: a *unique* sibling temp file (so
+/// concurrent writers never share one) then a rename, which is atomic on the
+/// same filesystem. A crash mid-write can never leave a half-written file the
+/// matching loader would swallow to a default. `mode` (unix only) is applied to
+/// the temp *before* the rename, so the real path appears with its final
+/// permissions and never a briefly-wider window — important for the token.
+/// The temp is removed on failure so it can't accumulate.
+pub(crate) fn write_atomic(path: &Path, contents: &str, mode: Option<u32>) -> io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    static WRITE_SEQ: AtomicU64 = AtomicU64::new(0);
+    let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp = path.with_extension(format!("tmp.{seq}"));
+    let attempt = || -> io::Result<()> {
+        std::fs::write(&tmp, contents)?;
+        #[cfg(unix)]
+        if let Some(mode) = mode {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(mode))?;
+        }
+        #[cfg(not(unix))]
+        let _ = mode;
+        std::fs::rename(&tmp, path)
+    };
+    attempt().inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })
+}
 
 /// The trackable slice of config. Anything secret stays in the token file.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -59,14 +90,11 @@ pub fn load_config(handle: &AppHandle) -> RemoteConfig {
 /// address is chosen once at startup).
 pub fn set_enabled(handle: &AppHandle, enabled: bool) -> io::Result<()> {
     let path = config_path(handle)?;
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
     let cfg = RemoteConfig {
         remote_enabled: enabled,
     };
     let json = serde_json::to_string_pretty(&cfg).map_err(io::Error::other)?;
-    std::fs::write(&path, json)
+    write_atomic(&path, &json, None)
 }
 
 /// Read the persisted token, generating + writing one if absent. On any IO
@@ -96,18 +124,9 @@ pub fn regenerate_token(handle: &AppHandle) -> io::Result<String> {
     Ok(token)
 }
 
-fn write_token(path: &PathBuf, token: &str) -> io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(path, token)?;
-    // The secret must not be readable by other local accounts.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    }
-    Ok(())
+// The secret must not be readable by other local accounts, hence mode 0600.
+fn write_token(path: &Path, token: &str) -> io::Result<()> {
+    write_atomic(path, token, Some(0o600))
 }
 
 /// 256 bits of randomness, hex-encoded (64 chars).
