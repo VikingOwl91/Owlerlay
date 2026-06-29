@@ -30,3 +30,7 @@ minijinja = "2.15.1"
 tokio-stream = { version = "0.1", features = ["sync"] }
 futures-core = "0.3"
 getrandom = "0.3"
+
+# ponytail: debug-only — lets an AI agent drive the native webview (keyboard, screenshots,
+# IPC) for UI testing. Gated behind cfg(debug_assertions) in lib.rs so it never ships in release.
+tauri-plugin-mcp-bridge = "0.11"

@@ -22,8 +22,17 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    // `mut` is only used by the debug-gated MCP bridge plugin below; unused in release.
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+
+    // Debug-only MCP bridge so an AI agent can drive the native webview for UI testing.
+    #[cfg(debug_assertions)]
+    {
+        builder = builder.plugin(tauri_plugin_mcp_bridge::init());
+    }
+
+    builder
         .setup(|app| {
             // Build state here (not before the builder) so we have an AppHandle
             // and the resolved config/token paths up front.
