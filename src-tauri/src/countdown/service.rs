@@ -1,10 +1,15 @@
+use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::errors::CountdownError;
 use crate::countdown::model::{Countdown, CountdownState};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
-const MAX_COUNTDOWNS: usize = 10;
+/// Upper bound on live countdowns — a sanity guardrail, not a hard limit: it
+/// stops runaway/accidental creation and keeps the control rail manageable.
+/// Raising it is cheap, but the ticker emits one event per running countdown
+/// every 100ms, so the event-bus buffer in `AppState::new` is sized off this.
+pub const MAX_COUNTDOWNS: usize = 64;
 
 #[derive(Debug)]
 pub struct CountdownService {
@@ -30,6 +35,62 @@ pub struct TickResult {
     pub newly_finished: Vec<u64>,
 }
 
+/// Map one persisted DTO back to a live `Countdown`, re-anchoring time against
+/// the current boot. We rebuild from wall-clock deltas rather than reconstruct
+/// the original `Instant`s — subtracting a long downtime from a monotonic
+/// `Instant` can underflow.
+fn restore_countdown(dto: CountdownSnapshotDto, now: Instant, now_epoch_ms: u128) -> Countdown {
+    let initial = Duration::from_millis(clamp_ms(dto.initial_duration));
+    match dto.state {
+        CountdownState::Idle => Countdown::new(dto.label, initial),
+        CountdownState::Paused => {
+            // Clamp to the configured length, same invariant the Running arm
+            // enforces: a paused timer can't hold more time than it started with.
+            let remaining = clamp_ms(dto.duration.min(dto.initial_duration));
+            Countdown::restore(
+                dto.label,
+                initial,
+                CountdownState::Paused,
+                Some(Duration::from_millis(remaining)),
+                None,
+                None,
+            )
+        }
+        CountdownState::Finished => Countdown::finished(dto.label, initial),
+        CountdownState::Running => {
+            // Remaining wall-clock until the persisted target (falling back to the
+            // stored remaining if a corrupt store dropped the target), clamped to
+            // the configured length so a backward clock change can't inflate it.
+            let remaining_ms = dto
+                .target_epoch_ms
+                .map(|t| t.saturating_sub(now_epoch_ms))
+                .unwrap_or(dto.duration)
+                .min(dto.initial_duration);
+            // ponytail: start_timestamp is approximated as `now`. The model never
+            // reads it (only target drives remaining_at); it's cosmetic in snaps.
+            match now.checked_add(Duration::from_millis(clamp_ms(remaining_ms))) {
+                Some(target) if remaining_ms > 0 => Countdown::restore(
+                    dto.label,
+                    initial,
+                    CountdownState::Running,
+                    None,
+                    Some(now),
+                    Some(target),
+                ),
+                // Elapsed during downtime, or a target so far out it overflows the
+                // monotonic clock → boot it Finished rather than panic.
+                _ => Countdown::finished(dto.label, initial),
+            }
+        }
+    }
+}
+
+/// Persisted durations are `u128` ms and may be corrupt/hand-edited; narrow to
+/// `u64` ms (what `Duration::from_millis` takes) without truncating to garbage.
+fn clamp_ms(ms: u128) -> u64 {
+    ms.min(u64::MAX as u128) as u64
+}
+
 impl Default for CountdownService {
     fn default() -> Self {
         Self::new()
@@ -41,6 +102,46 @@ impl CountdownService {
         Self {
             countdowns: Mutex::new(HashMap::new()),
             next_id: Mutex::new(0),
+        }
+    }
+
+    /// Rebuild the service from persisted DTOs. `now_epoch_ms` is the boot
+    /// wall-clock (from `ClockAnchor`); running countdowns are re-anchored
+    /// against it so they keep counting across the restart, and any that
+    /// expired during downtime come back `Finished`. `next_id` is derived as
+    /// `max(id)+1` (gaps from past deletes don't matter — we only need to avoid
+    /// colliding with a restored id).
+    pub fn from_dtos(dtos: Vec<CountdownSnapshotDto>, now_epoch_ms: u128) -> Self {
+        let now = Instant::now();
+        let next_id = dtos
+            .iter()
+            .map(|d| d.id)
+            .max()
+            .map_or(0, |m| m.saturating_add(1));
+        let mut countdowns = HashMap::with_capacity(dtos.len().min(MAX_COUNTDOWNS));
+        for dto in dtos {
+            // Defend against a corrupt/hand-edited store: cap at the same limit
+            // create_countdown enforces (so the ticker/overlay can't be handed
+            // more timers than the app expects), and keep the first entry per id
+            // (a duplicate id must not silently drop a timer in nondeterministic
+            // HashMap order). next_id is still derived from the full id range
+            // above, so it can't collide with a retained entry.
+            if countdowns.len() >= MAX_COUNTDOWNS {
+                break;
+            }
+            // Drop entries create_countdown would itself reject (empty label,
+            // zero length) so a corrupt store can't resurrect a blank/degenerate
+            // timer the app could never have created.
+            if dto.label.is_empty() || dto.initial_duration == 0 {
+                continue;
+            }
+            countdowns
+                .entry(dto.id)
+                .or_insert_with(|| restore_countdown(dto, now, now_epoch_ms));
+        }
+        Self {
+            countdowns: Mutex::new(countdowns),
+            next_id: Mutex::new(next_id),
         }
     }
 

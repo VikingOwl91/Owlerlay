@@ -73,6 +73,18 @@ Ordered, near-term first:
    with in-browser Kokoro TTS. Becomes a responsive companion for voice/alert
    animations.
 
+### Persistence rules
+
+Two rules keep the per-widget JSON store (item 3) tiny — sub-millisecond saves —
+through every later widget, so it never needs a binary format or a database:
+
+1. **Persist config + coarse run-state, never the high-frequency stream.**
+   Transient runtime data — the Twitch event firehose, the avatar's per-frame
+   audio reactivity, the 100ms countdown tick — must not route through the save
+   path. Only user-driven config/state changes persist.
+2. **Store media/3D/audio by path reference, never embedded.** A base64 blob in
+   the JSON store bloats it catastrophically; a path string stays ~50 bytes.
+
 ---
 
 ## Working agreement (Hybrid)
