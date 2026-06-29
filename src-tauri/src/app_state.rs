@@ -1,7 +1,8 @@
 use crate::countdown::events::AppEvent;
 use crate::countdown::service::CountdownService;
 use crate::overlay::service::OverlayService;
-use tokio::sync::broadcast;
+use tauri::AppHandle;
+use tokio::sync::{RwLock, broadcast};
 
 #[derive(Clone, Debug)]
 pub struct ClockAnchor {
@@ -36,16 +37,28 @@ pub struct AppState {
     pub countdown_service: CountdownService,
     pub overlay_service: OverlayService,
     pub event_bus: broadcast::Sender<AppEvent>,
+    /// Handle to the Tauri app, so HTTP control routes can emit the same
+    /// desktop-facing events the IPC commands do (keeps the panel in sync).
+    pub app_handle: AppHandle,
+    /// Resolved once at startup from the persisted config; drives the bind
+    /// address and gates the remote routes.
+    pub remote_enabled: bool,
+    /// Capability secret checked by the remote routes. Behind a lock so it can
+    /// be rotated at runtime (regenerate = revoke).
+    pub remote_token: RwLock<String>,
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(app_handle: AppHandle, remote_enabled: bool, remote_token: String) -> Self {
         let (event_bus, _) = broadcast::channel(64);
         Self {
             clock_anchor: ClockAnchor::new(),
             countdown_service: CountdownService::new(),
             overlay_service: OverlayService::new(),
             event_bus,
+            app_handle,
+            remote_enabled,
+            remote_token: RwLock::new(remote_token),
         }
     }
 }

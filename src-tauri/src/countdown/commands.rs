@@ -1,12 +1,31 @@
 use crate::app_state::AppState;
+use crate::app_state::ClockAnchor;
 use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::errors::CountdownError;
 use crate::countdown::events::{
-    AppEvent, CountdownTickPayload, finished_tick_events, state_change_events,
+    AppEvent, CountdownTickPayload, finished_events, state_change_events,
 };
+use crate::countdown::service::CountdownSnapshot;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State, command};
 use tokio::time::Instant;
+
+/// Single source of truth for snapshot → DTO mapping (incl. the clock-anchor
+/// `Instant` → epoch-ms conversion), shared by the list and single-snapshot
+/// paths so they can't drift.
+fn snap_to_dto(s: CountdownSnapshot, clock_anchor: &ClockAnchor) -> CountdownSnapshotDto {
+    CountdownSnapshotDto {
+        id: s.id,
+        label: s.label,
+        duration: s.duration.as_millis(),
+        initial_duration: s.initial_duration.as_millis(),
+        state: s.state,
+        start_epoch_ms: s.start_instant.map(|i| clock_anchor.instant_to_epoch_ms(i)),
+        target_epoch_ms: s
+            .target_instant
+            .map(|i| clock_anchor.instant_to_epoch_ms(i)),
+    }
+}
 
 pub(crate) async fn build_snapshot_dtos(
     state: &AppState,
@@ -14,23 +33,7 @@ pub(crate) async fn build_snapshot_dtos(
     let snapshots = state.countdown_service.list_countdown().await?;
     Ok(snapshots
         .into_iter()
-        .map(|s| {
-            let start = s
-                .start_instant
-                .map(|i| state.clock_anchor.instant_to_epoch_ms(i));
-            let target = s
-                .target_instant
-                .map(|i| state.clock_anchor.instant_to_epoch_ms(i));
-            CountdownSnapshotDto {
-                id: s.id,
-                label: s.label,
-                duration: s.duration.as_millis(),
-                initial_duration: s.initial_duration.as_millis(),
-                state: s.state,
-                start_epoch_ms: start,
-                target_epoch_ms: target,
-            }
-        })
+        .map(|s| snap_to_dto(s, &state.clock_anchor))
         .collect())
 }
 
@@ -39,20 +42,18 @@ fn emit_changed(app: &AppHandle, state: &AppState, snapshots: Vec<CountdownSnaps
     let _ = state.event_bus.send(AppEvent::Changed(snapshots));
 }
 
-/// Notify only the desktop UI of a state change, leaving overlays untouched.
-///
-/// Used for transitions that don't change what an overlay renders — pause and
-/// resume merely stop/restart the ticking timer, so the overlay keeps its
-/// current frame. Emitting [`AppEvent::Changed`] here would make connected OBS
-/// browser sources reload the whole page and flash on stream.
+/// Notify only the desktop UI (Tauri IPC), without touching the event bus.
 fn notify_desktop(app: &AppHandle, snapshots: &[CountdownSnapshotDto]) {
     let _ = app.emit("countdown_changed", snapshots);
 }
 
 /// Notify the desktop and patch overlays in place for a single countdown whose
-/// run-state changed (start/reset). Overlays update visibility (and, on reset,
-/// the restored value) via `countdown-state`/`countdown-tick` instead of a full
-/// page reload that would flash the OBS source.
+/// run-state changed (start/pause/resume/reset). Overlays update visibility
+/// (and, on reset, the restored value) via `countdown-state`/`countdown-tick`
+/// instead of a full page reload that would flash the OBS source. The broadcast
+/// `State` event is also how SSE-only clients (the phone remote) learn that the
+/// timer paused/resumed — overlays ignore `State` for any non-idle state, so
+/// pausing still keeps their current frame.
 fn emit_state_change(
     app: &AppHandle,
     state: &AppState,
@@ -65,6 +66,57 @@ fn emit_state_change(
             let _ = state.event_bus.send(event);
         }
     }
+}
+
+// Shared timer-control logic, called by both the Tauri IPC commands (below) and
+// the LAN remote HTTP routes (`server::remote`). Centralising the mutate+emit
+// here is what keeps the desktop panel, OBS overlays, AND the phone remote in
+// sync no matter which transport drove the change. All four broadcast a `State`
+// event (via emit_state_change) so the SSE-only remote tracks every transition;
+// overlays only act on `State` for idle visibility, so they never flash.
+
+pub(crate) async fn do_start(
+    app: &AppHandle,
+    state: &AppState,
+    id: u64,
+) -> Result<(), CountdownError> {
+    state.countdown_service.start(id, Instant::now()).await?;
+    let snapshots = build_snapshot_dtos(state).await?;
+    emit_state_change(app, state, &snapshots, id);
+    Ok(())
+}
+
+pub(crate) async fn do_reset(
+    app: &AppHandle,
+    state: &AppState,
+    id: u64,
+) -> Result<(), CountdownError> {
+    state.countdown_service.reset(id).await?;
+    let snapshots = build_snapshot_dtos(state).await?;
+    emit_state_change(app, state, &snapshots, id);
+    Ok(())
+}
+
+pub(crate) async fn do_pause(
+    app: &AppHandle,
+    state: &AppState,
+    id: u64,
+) -> Result<(), CountdownError> {
+    state.countdown_service.pause(id, Instant::now()).await?;
+    let snapshots = build_snapshot_dtos(state).await?;
+    emit_state_change(app, state, &snapshots, id);
+    Ok(())
+}
+
+pub(crate) async fn do_resume(
+    app: &AppHandle,
+    state: &AppState,
+    id: u64,
+) -> Result<(), CountdownError> {
+    state.countdown_service.resume(id, Instant::now()).await?;
+    let snapshots = build_snapshot_dtos(state).await?;
+    emit_state_change(app, state, &snapshots, id);
+    Ok(())
 }
 
 #[command]
@@ -118,16 +170,7 @@ pub async fn countdown_start(
     state: State<'_, Arc<AppState>>,
     id: u64,
 ) -> Result<(), String> {
-    state
-        .countdown_service
-        .start(id, Instant::now())
-        .await
-        .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state)
-        .await
-        .map_err(|e| e.to_string())?;
-    emit_state_change(&app, &state, &snapshots, id);
-    Ok(())
+    do_start(&app, &state, id).await.map_err(|e| e.to_string())
 }
 
 #[command]
@@ -136,16 +179,7 @@ pub async fn countdown_reset(
     state: State<'_, Arc<AppState>>,
     id: u64,
 ) -> Result<(), String> {
-    state
-        .countdown_service
-        .reset(id)
-        .await
-        .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state)
-        .await
-        .map_err(|e| e.to_string())?;
-    emit_state_change(&app, &state, &snapshots, id);
-    Ok(())
+    do_reset(&app, &state, id).await.map_err(|e| e.to_string())
 }
 
 #[command]
@@ -154,16 +188,7 @@ pub async fn countdown_pause(
     state: State<'_, Arc<AppState>>,
     id: u64,
 ) -> Result<(), String> {
-    state
-        .countdown_service
-        .pause(id, Instant::now())
-        .await
-        .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state)
-        .await
-        .map_err(|e| e.to_string())?;
-    notify_desktop(&app, &snapshots);
-    Ok(())
+    do_pause(&app, &state, id).await.map_err(|e| e.to_string())
 }
 
 #[command]
@@ -172,16 +197,7 @@ pub async fn countdown_resume(
     state: State<'_, Arc<AppState>>,
     id: u64,
 ) -> Result<(), String> {
-    state
-        .countdown_service
-        .resume(id, Instant::now())
-        .await
-        .map_err(|e: CountdownError| e.to_string())?;
-    let snapshots = build_snapshot_dtos(&state)
-        .await
-        .map_err(|e| e.to_string())?;
-    notify_desktop(&app, &snapshots);
-    Ok(())
+    do_resume(&app, &state, id).await.map_err(|e| e.to_string())
 }
 
 #[command]
@@ -194,21 +210,7 @@ pub async fn countdown_snapshot(
         .snapshot(id, Instant::now())
         .await
         .map_err(|e: CountdownError| e.to_string())?;
-    let start = s
-        .start_instant
-        .map(|i| state.clock_anchor.instant_to_epoch_ms(i));
-    let target = s
-        .target_instant
-        .map(|i| state.clock_anchor.instant_to_epoch_ms(i));
-    Ok(CountdownSnapshotDto {
-        id: s.id,
-        label: s.label,
-        duration: s.duration.as_millis(),
-        initial_duration: s.initial_duration.as_millis(),
-        state: s.state,
-        start_epoch_ms: start,
-        target_epoch_ms: target,
-    })
+    Ok(snap_to_dto(s, &state.clock_anchor))
 }
 
 pub(crate) fn spawn_ticker(app: AppHandle) {
@@ -241,7 +243,7 @@ pub(crate) fn spawn_ticker(app: AppHandle) {
                 // Overlays: push a final tick (remaining 0) per finished
                 // countdown instead of a reload, so OBS browser sources land on
                 // zero in place without flashing the source on stream.
-                for event in finished_tick_events(&result.newly_finished, &snapshots) {
+                for event in finished_events(&result.newly_finished, &snapshots) {
                     let _ = state.event_bus.send(event);
                 }
             }

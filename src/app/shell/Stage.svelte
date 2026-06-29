@@ -3,6 +3,7 @@
   import type { Duration } from "../../shared/time/duration";
   import CountdownDetail from "../../features/countdown/components/CountdownDetail.svelte";
   import GroupPanel from "../../features/overlay/components/GroupPanel.svelte";
+  import RemoteSettings from "../../features/remote/RemoteSettings.svelte";
   import OwlMark from "./OwlMark.svelte";
   import type { Subject } from "./types";
 
@@ -79,6 +80,8 @@
     </div>
   {:else if subject === "group"}
     <GroupPanel />
+  {:else if subject === "settings"}
+    <RemoteSettings />
   {:else if $countdownStore.selected}
     <CountdownDetail />
   {:else}

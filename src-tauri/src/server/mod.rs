@@ -5,7 +5,11 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
+mod remote;
 mod routes;
+
+/// The single port the overlay + remote server listens on.
+pub const PORT: u16 = 7420;
 
 pub async fn start(state: Arc<AppState>) {
     let app = Router::new()
@@ -13,16 +17,33 @@ pub async fn start(state: Arc<AppState>) {
         .route("/overlay", get(routes::overlay_group))
         .route("/sse/group/{id}", get(routes::sse_group))
         .nest_service("/static", ServeDir::new("public"))
+        .merge(remote::router(state.clone()))
         .layer(
+            // Public overlay routes only need cross-origin GETs (OBS). The
+            // remote page is same-origin, so its POSTs aren't subject to CORS.
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_methods([Method::GET]),
         )
-        .with_state(state);
+        .with_state(state.clone());
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:7420")
-        .await
-        .expect("failed to bind overlay server on :7420");
+    // Opt-in LAN exposure: bind all interfaces only when the owner enabled the
+    // phone remote, otherwise stay loopback-only (the historical default).
+    let host = if state.remote_enabled {
+        "0.0.0.0"
+    } else {
+        "127.0.0.1"
+    };
+    let addr = format!("{host}:{PORT}");
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            // Port already in use (e.g. a stale instance) shouldn't crash the
+            // app — log and leave the server down rather than panic the task.
+            eprintln!("overlay server: failed to bind {addr}: {e}");
+            return;
+        }
+    };
 
     axum::serve(listener, app)
         .await

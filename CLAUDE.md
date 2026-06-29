@@ -40,6 +40,9 @@ working agreement in [AGENTS.md](./AGENTS.md)).
 | `src-tauri/src/lib.rs` | Tauri builder & command registration |
 | `src-tauri/src/countdown/` | Countdown feature (commands, logic) |
 | `src-tauri/src/app_state.rs` | Shared app state |
+| `src-tauri/src/server/` | Axum overlay/SSE server + LAN remote API (`remote.rs`) |
+| `src-tauri/src/settings.rs` | Persisted remote config + capability token |
+| `src-tauri/src/remote.rs` | Phone-remote Tauri commands |
 | `src-tauri/tauri.conf.json` | Tauri configuration |
 
 ---
