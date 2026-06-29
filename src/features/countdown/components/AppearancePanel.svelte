@@ -14,27 +14,27 @@
   // face. The control-room faces lead; fallbacks cover any OBS machine.
   const FONTS = {
     mono: {
-      label: "Mono · Tabular",
+      label: "Spline Sans Mono · Mono",
       stack:
         '"Spline Sans Mono", ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
     },
     sans: {
-      label: "Clean Sans",
+      label: "Hanken Grotesk · Sans",
       stack:
         '"Hanken Grotesk", "Inter", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif',
     },
     display: {
-      label: "Bold Display",
+      label: "Bricolage Grotesque · Display",
       stack:
         '"Bricolage Grotesque", "Archivo Black", "Arial Black", Impact, system-ui, sans-serif',
     },
     rounded: {
-      label: "Rounded",
+      label: "Quicksand · Rounded",
       stack:
         '"Quicksand", "Varela Round", "Nunito", "SF Pro Rounded", system-ui, sans-serif',
     },
     serif: {
-      label: "Serif",
+      label: "Fraunces · Serif",
       stack: '"Fraunces", Georgia, "Times New Roman", serif',
     },
   } as const;
