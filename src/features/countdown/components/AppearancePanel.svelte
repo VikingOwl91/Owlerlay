@@ -53,6 +53,7 @@
   type FontKey = keyof typeof FONTS;
 
   let fontOpen = $state(false);
+  let triggerEl = $state<HTMLButtonElement>();
 
   // Close the font picker on any click outside it (capture phase fires before
   // the option's own onclick, so selecting still works).
@@ -66,6 +67,43 @@
         document.removeEventListener("click", handler, true);
       },
     };
+  }
+
+  // The option list only mounts while open, so this action's setup IS the
+  // "on open" hook: move focus onto the selected option (or the first).
+  function focusOpen(node: HTMLElement) {
+    const opt =
+      node.querySelector<HTMLElement>(".fp-opt.sel") ??
+      node.querySelector<HTMLElement>(".fp-opt");
+    opt?.focus();
+  }
+
+  // Listbox keyboard nav. DOM focus is the highlight — no separate state.
+  function listKeys(e: KeyboardEvent) {
+    const opts = [
+      ...(e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        ".fp-opt",
+      ),
+    ];
+    const i = opts.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      opts[(i + 1) % opts.length]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      opts[(i - 1 + opts.length) % opts.length]?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      opts[0]?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      opts[opts.length - 1]?.focus();
+    } else if (e.key === "Escape") {
+      fontOpen = false;
+      triggerEl?.focus();
+    }
+    // Enter/Space need no handling — the focused option button fires its own
+    // onclick (select + close).
   }
 
   type OverlaySettings = {
@@ -240,7 +278,14 @@
             aria-haspopup="listbox"
             aria-expanded={fontOpen}
             aria-labelledby="ap-fn"
+            bind:this={triggerEl}
             onclick={() => (fontOpen = !fontOpen)}
+            onkeydown={(e) => {
+              if (e.key === "ArrowDown" && !fontOpen) {
+                e.preventDefault();
+                fontOpen = true;
+              }
+            }}
           >
             <span class="fp-name" style="font-family: {FONTS[s.font].preview}"
               >{FONTS[s.font].name}</span
@@ -248,7 +293,13 @@
             <span class="fp-chev" class:open={fontOpen}>▾</span>
           </button>
           {#if fontOpen}
-            <ul class="fp-list" role="listbox" aria-labelledby="ap-fn">
+            <ul
+              class="fp-list"
+              role="listbox"
+              aria-labelledby="ap-fn"
+              use:focusOpen
+              onkeydown={listKeys}
+            >
               {#each Object.entries(FONTS) as [key, f] (key)}
                 <li role="option" aria-selected={s.font === key}>
                   <button
@@ -575,14 +626,26 @@
     font-size: 13.5px;
   }
 
+  /* Native <select>: reset appearance so the dark background applies (the
+     webview otherwise draws its own light widget), supply a caret, and theme
+     the option popup — matches GroupPanel's select.text. */
   .select {
+    appearance: none;
     font-size: 13.5px;
-    background: var(--ink);
+    background-color: var(--ink);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%239d94ae' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
     border: 1px solid var(--haze-soft);
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 6px 30px 6px 10px;
     color: var(--moon);
     cursor: pointer;
+  }
+  .select option {
+    background: var(--ink-raised);
+    color: var(--moon);
   }
 
   .fontpick {
