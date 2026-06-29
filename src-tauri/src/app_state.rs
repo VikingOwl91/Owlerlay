@@ -1,3 +1,4 @@
+use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::events::AppEvent;
 use crate::countdown::service::CountdownService;
 use crate::overlay::service::OverlayService;
@@ -49,11 +50,21 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(app_handle: AppHandle, remote_enabled: bool, remote_token: String) -> Self {
+    pub fn new(
+        app_handle: AppHandle,
+        remote_enabled: bool,
+        remote_token: String,
+        persisted: Vec<CountdownSnapshotDto>,
+    ) -> Self {
         let (event_bus, _) = broadcast::channel(64);
+        // Anchor first, then restore countdowns against its boot wall-clock so
+        // running timers keep counting across the restart.
+        let clock_anchor = ClockAnchor::new();
+        let countdown_service =
+            CountdownService::from_dtos(persisted, clock_anchor.boot_epoch_ms);
         Self {
-            clock_anchor: ClockAnchor::new(),
-            countdown_service: CountdownService::new(),
+            clock_anchor,
+            countdown_service,
             overlay_service: OverlayService::new(),
             event_bus,
             app_handle,

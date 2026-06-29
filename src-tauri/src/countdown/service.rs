@@ -1,3 +1,4 @@
+use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::errors::CountdownError;
 use crate::countdown::model::{Countdown, CountdownState};
 use std::collections::HashMap;
@@ -30,6 +31,64 @@ pub struct TickResult {
     pub newly_finished: Vec<u64>,
 }
 
+/// Map one persisted DTO back to a live `Countdown`, re-anchoring time against
+/// the current boot. We rebuild from wall-clock deltas rather than reconstruct
+/// the original `Instant`s — subtracting a long downtime from a monotonic
+/// `Instant` can underflow.
+fn restore_countdown(dto: CountdownSnapshotDto, now: Instant, now_epoch_ms: u128) -> Countdown {
+    let initial = Duration::from_millis(dto.initial_duration as u64);
+    match dto.state {
+        CountdownState::Idle => Countdown::new(dto.label, initial),
+        CountdownState::Paused => Countdown::restore(
+            dto.label,
+            initial,
+            CountdownState::Paused,
+            Some(Duration::from_millis(dto.duration as u64)),
+            None,
+            None,
+        ),
+        CountdownState::Finished => Countdown::restore(
+            dto.label,
+            initial,
+            CountdownState::Finished,
+            Some(Duration::from_secs(0)),
+            None,
+            None,
+        ),
+        CountdownState::Running => {
+            // Remaining wall-clock until the persisted target. If it already
+            // elapsed (or there's no target), boot it Finished.
+            let remaining_ms = dto
+                .target_epoch_ms
+                .map(|t| t.saturating_sub(now_epoch_ms))
+                .unwrap_or(0);
+            if remaining_ms == 0 {
+                Countdown::restore(
+                    dto.label,
+                    initial,
+                    CountdownState::Finished,
+                    Some(Duration::from_secs(0)),
+                    None,
+                    None,
+                )
+            } else {
+                let remaining = Duration::from_millis(remaining_ms as u64);
+                // ponytail: start_timestamp is approximated as `now`. The model
+                // never reads it (only target drives remaining_at); it's purely
+                // cosmetic in snapshots.
+                Countdown::restore(
+                    dto.label,
+                    initial,
+                    CountdownState::Running,
+                    None,
+                    Some(now),
+                    Some(now + remaining),
+                )
+            }
+        }
+    }
+}
+
 impl Default for CountdownService {
     fn default() -> Self {
         Self::new()
@@ -41,6 +100,25 @@ impl CountdownService {
         Self {
             countdowns: Mutex::new(HashMap::new()),
             next_id: Mutex::new(0),
+        }
+    }
+
+    /// Rebuild the service from persisted DTOs. `now_epoch_ms` is the boot
+    /// wall-clock (from `ClockAnchor`); running countdowns are re-anchored
+    /// against it so they keep counting across the restart, and any that
+    /// expired during downtime come back `Finished`. `next_id` is derived as
+    /// `max(id)+1` (gaps from past deletes don't matter — we only need to avoid
+    /// colliding with a restored id).
+    pub fn from_dtos(dtos: Vec<CountdownSnapshotDto>, now_epoch_ms: u128) -> Self {
+        let now = Instant::now();
+        let next_id = dtos.iter().map(|d| d.id + 1).max().unwrap_or(0);
+        let mut countdowns = HashMap::with_capacity(dtos.len());
+        for dto in dtos {
+            countdowns.insert(dto.id, restore_countdown(dto, now, now_epoch_ms));
+        }
+        Self {
+            countdowns: Mutex::new(countdowns),
+            next_id: Mutex::new(next_id),
         }
     }
 

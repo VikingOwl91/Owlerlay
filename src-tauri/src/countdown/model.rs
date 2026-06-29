@@ -32,6 +32,27 @@ impl Countdown {
         }
     }
 
+    /// Rebuild a countdown from persisted state. The caller (the store-restore
+    /// path) is responsible for translating epoch-ms back into live `Instant`s
+    /// against the current boot, so this just sets the fields verbatim.
+    pub fn restore(
+        label: impl Into<String>,
+        initial_duration: Duration,
+        state: CountdownState,
+        remaining_duration_stored: Option<Duration>,
+        start_timestamp: Option<Instant>,
+        target_timestamp: Option<Instant>,
+    ) -> Self {
+        Self {
+            label: label.into(),
+            initial_duration,
+            remaining_duration_stored,
+            state,
+            start_timestamp,
+            target_timestamp,
+        }
+    }
+
     pub fn label(&self) -> &str {
         &self.label
     }

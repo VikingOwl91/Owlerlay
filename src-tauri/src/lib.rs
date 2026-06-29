@@ -46,10 +46,12 @@ pub fn run() {
             let handle = app.handle().clone();
             let config = settings::load_config(&handle);
             let token = settings::load_or_create_token(&handle);
+            let persisted = countdown::store::load(&handle);
             app.manage(Arc::new(AppState::new(
                 handle,
                 config.remote_enabled,
                 token,
+                persisted,
             )));
             Ok(())
         })
