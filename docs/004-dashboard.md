@@ -24,32 +24,54 @@ through each item.
 
 ## Scope
 
-1. Add a `"dashboard"` subject (or use `null` as the dashboard state).
-2. Create a `Dashboard.svelte` component rendered when no specific item
-   is selected.
-3. Dashboard content:
-   - **Grouped sections** — one card/section per group, showing the group
-     name, layout info, and its member countdowns with live state + time.
-   - **Ungrouped section** — countdowns not assigned to any group.
-   - Each countdown row: state pip (Idle/Running/Paused/Finished), name,
-     live remaining time.
-   - Click a countdown → navigate to its detail view.
-   - Click a group header → navigate to group panel.
-4. Wire into `Stage.svelte` as the default view.
+1. Add a `"dashboard"` `Subject` variant in `src/app/shell/types.ts` and
+   route it through `AppShell` and `Stage`.
+2. New `src/app/shell/Dashboard.svelte` rendered when no specific
+   countdown or group is selected.
+3. Sections:
+   - **Live** (top) — every Running countdown as a tile, regardless of
+     group membership. Highest visibility because it's what the streamer
+     is watching right now.
+   - **Groups** — one card per group, each containing a tile per member
+     countdown. Members show the same state pip, label, and live
+     remaining as the rest of the app.
+   - **Ungrouped** — one tile per countdown not in any group's
+     `members` list.
+4. **Each tile is interactive** (per design decision):
+   - "Open" / title-click → switches `subject` to that countdown
+     (`countdown`) or group (`group`).
+   - Inline transport buttons per countdown tile: Start, Pause, Reset.
+     These call the existing `countdownStore.startSelected/...`
+     actions against the tile's id (re-using the same paths the
+     detail panel uses — single source of truth).
+   - Tile-color follows the existing state palette
+     (`--st-idle / --st-running / --st-paused / --st-finished`) so the
+     dashboard reads as a glance-able status board.
+5. Subscribes to `countdownStore.items` and `groupStore.items` for
+   live updates; no polling.
 
-## Design direction
+## Design direction (frontend-design skill)
 
-- Card-based layout. Each group is a card with its members listed inside.
-- Live-updating — subscribe to the existing countdown store's tick updates.
-- Compact but informative — this is a monitoring view, not a control panel.
-- Match existing Pico CSS + app aesthetic.
+- Tile shape is **clearly distinct** from the rail strips on the left:
+  the rail strips have no affordances, the dashboard tiles do.
+  Visually heavier (border, small shadow, more padding).
+- Type uses the existing tokens (`--font-display` for headings,
+  `--font-mono` for the timer digits, `--eye` accent for the live
+  section header).
+- One memorable quality: the "Live" section at the top, with a soft
+  pulse on each running tile's pip, makes the dashboard feel like a
+  live console. No decorative gradients — strictly the established
+  twilight-and-tawny palette.
+- Honest empty states ("No live countdowns right now",
+  "No groups yet — create one to bundle widgets",
+  "Create your first countdown" CTA), no fabricated values.
 
 ## Out of scope
 
-- Drag-and-drop reordering.
-- Quick-actions (start/pause) directly from the dashboard (keep it read-only
-  for now — click through to detail for controls).
-- Preview rendering (separate issue: 006, 008).
+- Drag-and-drop reordering (tiles or groups).
+- Per-tile config (overlay settings belong on the countdown detail;
+  the dashboard is a status surface, not an editor).
+- Preview rendering (separate issues: 006, 007).
 
 ## Verification
 

@@ -7,60 +7,80 @@
 
 ## Problem
 
-When customizing a countdown's appearance (font, colors, progress bar, icon),
-the user can't see what it will look like in OBS without switching context.
-A live preview in the countdown detail view would let them iterate on
-appearance settings instantly.
+When customizing a countdown's appearance (font, colors, progress bar,
+icon), the user can't see what it will look like in OBS without
+switching context. A preview embedded next to the appearance controls
+lets them iterate instantly.
 
 ## Current state
 
-- `CountdownDetail.svelte` shows controls (start/pause/reset) and embeds
-  `AppearancePanel.svelte` for design settings.
+- `CountdownDetail.svelte` shows controls (start/pause/reset) and
+  embeds `AppearancePanel.svelte` for design settings.
 - `AppearancePanel` has rich controls (icon, colors, font, time format,
   progress bar, etc.) but no visual preview.
-- No single-countdown overlay endpoint exists — the server only renders
-  groups at `/overlay?group={id}`.
 
 ## Scope
 
-### Backend
-
-1. Add a single-countdown overlay endpoint: `/overlay?countdown={id}`
-   (or `/overlay/countdown/{id}`). Renders just that one countdown using
-   the same template, as if it were the sole member of a virtual group.
-
 ### Frontend
 
-2. Embed a scaled `<iframe>` in `CountdownDetail.svelte` (or inside
-   `AppearancePanel`) pointing at the single-countdown endpoint.
-3. The iframe auto-updates via SSE (ticks + config reload) — same
-   mechanism as the group overlay.
-4. Position the preview above the appearance controls so the user sees
-   the effect of each change immediately.
-5. Style to match the group preview (006) — mini OBS window look.
+1. Reuse the shared `PreviewTile.svelte` from issue 006 (same
+   component, single member instead of first-group-member).
+2. Place the preview **above** the appearance controls in
+   `CountdownDetail.svelte` so editing a setting shows the result
+   immediately (glance up, see the change).
+3. The preview reads the persisted `OverlayConfig` from the hydrated
+   cache (issue 002) — if hydration didn't happen for this countdown,
+   the existing `Default` falls back gracefully without loading state.
+4. Add a side panel layout option: a side-by-side configuration form
+   on the left, live preview on the right, on wide enough viewports
+   (`>1100px`); stacked on narrow ones.
+
+### No new backend endpoint.
+
+The single-countdown overlay endpoint
+(`/overlay?countdown=<id>`, originally proposed in the first draft of
+this spec) is **not** needed for this issue — the Svelte preview is
+self-contained. If a real "OBS-wants-this-URL" use case surfaces
+later, that endpoint can land independently.
 
 ## Design decisions
 
-- **Single-countdown endpoint:** Lightweight — reuse the existing group
-  render logic but with a one-element members list. The route handler
-  can construct a virtual `CountdownView` from just the one countdown.
-- **Preview placement:** Above appearance controls is most natural —
-  change a setting, glance up to see the result.
+- **Svelte mock, not iframe.** Same reasoning as 006: no CSP work,
+  no per-keystroke SSE churn, native tokens, refreshes in step with
+  the form, and the OBS "Open in browser" link serves as the
+  exact-parity escape hatch when genuinely needed.
+- **Preview placement above controls.** Edit a colour, glance up,
+  see the result. The original full-width readout remains below
+  the controls for the big at-a-glance view.
+- **Single shared preview component.** 006 and 007 ship the same
+  `PreviewTile.svelte` — duplication is forbidden because the two
+  surfaces *must* render identically when they show the same
+  countdown.
 
 ## Dependencies
 
-- Benefits from 002 (persisted overlay config) so the preview survives
-  navigation.
-- Benefits from 005 (icon + label + layout) for a richer preview.
+- Issue 002 (persisted overlay config) so the preview reflects saved
+  settings.
+- Issue 005 (icon-label + layout presets) for the rich preview. The
+  preview can ship before 005 in a degraded shape (single-row layout
+  only) if needed for sequencing.
 
 ## Out of scope
 
 - Editing appearance directly in the preview (click-to-style).
 - Full-screen preview mode.
+- A server-rendered single-countdown endpoint (out; the Svelte mock
+  is sufficient for the control-UI preview loop).
 
 ## Verification
 
-- Open a countdown detail → preview shows the countdown as OBS would.
-- Change font/color/icon → preview updates live.
-- Start/pause/reset → preview reflects state.
-- Compare preview to actual OBS browser source → pixel-identical.
+- Open a countdown detail → preview shows the countdown as it would
+  appear in OBS, using the persisted `OverlayConfig`.
+- Change font, colour, icon, progress-bar colour, or layout preset →
+  preview updates without any navigation.
+- Same configuration across two restarts renders identically (relies
+  on 002).
+- The preview matches the live OBS overlay URL "as closely as the
+  Svelte render can get" — the SSR render test
+  (`tests/overlay_render.rs`) is the source of truth for OBS
+  fidelity; regression must fail there before the preview can drift.
