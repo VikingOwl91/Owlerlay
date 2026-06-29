@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { setOverlayConfig } from "../api/countdown.client";
-  import type { OverlayConfig } from "../model/countdown.types";
+  import type { OverlayConfig, TimeFormat } from "../model/countdown.types";
   import { OVERLAY_SERVER_ORIGIN } from "../../../shared/overlay/origin";
 
   let { id }: { id: number } = $props();
@@ -9,9 +9,107 @@
   // UI-facing settings; a few fields are split out from the wire `OverlayConfig`
   // for friendlier controls (transparent toggle, border width+colour, shadow
   // on/off, icon/font size in rem). `toConfig` composes them back.
+  // Curated font choices. `stack` is the wire value sent to the overlay (clean
+  // family name → its bundled @font-face, then system fallbacks). `preview` is
+  // for the control-UI picker only: it leads with the "<Name> Variable" family
+  // that @fontsource registers here (see main.ts), so each option renders in
+  // its own face.
+  const FONTS = {
+    mono: {
+      name: "Spline Sans Mono",
+      kind: "Mono",
+      stack:
+        '"Spline Sans Mono", ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
+      preview: '"Spline Sans Mono Variable", ui-monospace, monospace',
+    },
+    sans: {
+      name: "Hanken Grotesk",
+      kind: "Sans",
+      stack:
+        '"Hanken Grotesk", "Inter", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif',
+      preview: '"Hanken Grotesk Variable", system-ui, sans-serif',
+    },
+    display: {
+      name: "Bricolage Grotesque",
+      kind: "Display",
+      stack:
+        '"Bricolage Grotesque", "Archivo Black", "Arial Black", Impact, system-ui, sans-serif',
+      preview: '"Bricolage Grotesque Variable", system-ui, sans-serif',
+    },
+    rounded: {
+      name: "Quicksand",
+      kind: "Rounded",
+      stack:
+        '"Quicksand", "Varela Round", "Nunito", "SF Pro Rounded", system-ui, sans-serif',
+      preview: '"Quicksand Variable", system-ui, sans-serif',
+    },
+    serif: {
+      name: "Fraunces",
+      kind: "Serif",
+      stack: '"Fraunces", Georgia, "Times New Roman", serif',
+      preview: '"Fraunces Variable", Georgia, serif',
+    },
+  } as const;
+  type FontKey = keyof typeof FONTS;
+
+  let fontOpen = $state(false);
+  let triggerEl = $state<HTMLButtonElement>();
+
+  // Close the font picker on any click outside it (capture phase fires before
+  // the option's own onclick, so selecting still works).
+  function clickOutside(node: HTMLElement, onOut: () => void) {
+    const handler = (e: MouseEvent) => {
+      if (!node.contains(e.target as Node)) onOut();
+    };
+    document.addEventListener("click", handler, true);
+    return {
+      destroy() {
+        document.removeEventListener("click", handler, true);
+      },
+    };
+  }
+
+  // The option list only mounts while open, so this action's setup IS the
+  // "on open" hook: move focus onto the selected option (or the first).
+  function focusOpen(node: HTMLElement) {
+    const opt =
+      node.querySelector<HTMLElement>(".fp-opt.sel") ??
+      node.querySelector<HTMLElement>(".fp-opt");
+    opt?.focus();
+  }
+
+  // Listbox keyboard nav. DOM focus is the highlight — no separate state.
+  function listKeys(e: KeyboardEvent) {
+    const opts = [
+      ...(e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        ".fp-opt",
+      ),
+    ];
+    const i = opts.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      opts[(i + 1) % opts.length]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      opts[(i - 1 + opts.length) % opts.length]?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      opts[0]?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      opts[opts.length - 1]?.focus();
+    } else if (e.key === "Escape") {
+      fontOpen = false;
+      triggerEl?.focus();
+    }
+    // Enter/Space need no handling — the focused option button fires its own
+    // onclick (select + close).
+  }
+
   type OverlaySettings = {
     icon: string;
     showTimer: boolean;
+    font: FontKey;
     fontSize: number;
     textColor: string;
     iconSize: number;
@@ -26,12 +124,22 @@
     barFg: string;
     barBg: string;
     dividerColor: string;
-    showHHMM: boolean;
+    timeFormat: TimeFormat;
   };
+
+  // Label each time format by what it shows, with an example.
+  const TIME_FORMATS: { value: TimeFormat; label: string }[] = [
+    { value: "auto", label: "Auto · 05:03" },
+    { value: "dhms", label: "DD:HH:MM:SS" },
+    { value: "hms", label: "HH:MM:SS" },
+    { value: "ms", label: "MM:SS" },
+    { value: "s", label: "Seconds" },
+  ];
 
   const DEFAULT_SETTINGS: OverlaySettings = {
     icon: "",
     showTimer: true,
+    font: "mono",
     fontSize: 2,
     textColor: "#ffffff",
     iconSize: 2,
@@ -46,7 +154,7 @@
     barFg: "#4ade80",
     barBg: "#333333",
     dividerColor: "#ffffff",
-    showHHMM: false,
+    timeFormat: "auto",
   };
 
   function toConfig(s: OverlaySettings): OverlayConfig {
@@ -55,6 +163,7 @@
       showTimer: s.showTimer,
       showProgress: s.showProgress,
       fontSize: s.fontSize,
+      fontFamily: FONTS[s.font].stack,
       textColor: s.textColor,
       background: s.bgTransparent ? "transparent" : s.bgColor,
       border:
@@ -68,7 +177,7 @@
       dividerColor: s.dividerColor,
       barBg: s.barBg,
       barFg: s.barFg,
-      showHhMm: s.showHHMM,
+      timeFormat: s.timeFormat,
     };
   }
 
@@ -137,14 +246,18 @@
         />
       </div>
       <div class="field">
-        <label for="ap-hhmm">Show HH:MM</label>
-        <input
-          id="ap-hhmm"
-          type="checkbox"
-          class="toggle"
-          checked={s.showHHMM}
-          onchange={(e) => set({ showHHMM: e.currentTarget.checked })}
-        />
+        <label for="ap-tf">Time format</label>
+        <select
+          id="ap-tf"
+          class="select"
+          value={s.timeFormat}
+          onchange={(e) =>
+            set({ timeFormat: e.currentTarget.value as TimeFormat })}
+        >
+          {#each TIME_FORMATS as fmt (fmt.value)}
+            <option value={fmt.value}>{fmt.label}</option>
+          {/each}
+        </select>
       </div>
       <div class="field">
         <label for="ap-tc">Text colour</label>
@@ -155,6 +268,59 @@
           value={s.textColor}
           onchange={(e) => set({ textColor: e.currentTarget.value })}
         />
+      </div>
+      <div class="field">
+        <span id="ap-fn" class="lbl">Font</span>
+        <div class="fontpick" use:clickOutside={() => (fontOpen = false)}>
+          <button
+            type="button"
+            class="fp-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={fontOpen}
+            aria-labelledby="ap-fn"
+            bind:this={triggerEl}
+            onclick={() => (fontOpen = !fontOpen)}
+            onkeydown={(e) => {
+              if (e.key === "ArrowDown" && !fontOpen) {
+                e.preventDefault();
+                fontOpen = true;
+              }
+            }}
+          >
+            <span class="fp-name" style="font-family: {FONTS[s.font].preview}"
+              >{FONTS[s.font].name}</span
+            >
+            <span class="fp-chev" class:open={fontOpen}>▾</span>
+          </button>
+          {#if fontOpen}
+            <ul
+              class="fp-list"
+              role="listbox"
+              aria-labelledby="ap-fn"
+              use:focusOpen
+              onkeydown={listKeys}
+            >
+              {#each Object.entries(FONTS) as [key, f] (key)}
+                <li role="option" aria-selected={s.font === key}>
+                  <button
+                    type="button"
+                    class="fp-opt"
+                    class:sel={s.font === key}
+                    onclick={() => {
+                      set({ font: key as FontKey });
+                      fontOpen = false;
+                    }}
+                  >
+                    <span class="fp-opt-name" style="font-family: {f.preview}"
+                      >{f.name}</span
+                    >
+                    <span class="fp-opt-kind">{f.kind}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
       </div>
       <div class="field">
         <label for="ap-fs">Font size</label>
@@ -453,5 +619,112 @@
     color: var(--moon);
     width: 72px;
     text-align: center;
+  }
+
+  .lbl {
+    color: var(--dim);
+    font-size: 13.5px;
+  }
+
+  /* Native <select>: reset appearance so the dark background applies (the
+     webview otherwise draws its own light widget), supply a caret, and theme
+     the option popup — matches GroupPanel's select.text. */
+  .select {
+    appearance: none;
+    font-size: 13.5px;
+    background-color: var(--ink);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%239d94ae' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    border: 1px solid var(--haze-soft);
+    border-radius: 8px;
+    padding: 6px 30px 6px 10px;
+    color: var(--moon);
+    cursor: pointer;
+  }
+  .select option {
+    background: var(--ink-raised);
+    color: var(--moon);
+  }
+
+  .fontpick {
+    position: relative;
+  }
+  .fp-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 170px;
+    background: var(--ink);
+    border: 1px solid var(--haze-soft);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--moon);
+    cursor: pointer;
+    text-align: left;
+  }
+  .fp-name {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .fp-chev {
+    color: var(--dim);
+    font-size: 11px;
+    transition: transform 0.15s;
+  }
+  .fp-chev.open {
+    transform: rotate(180deg);
+  }
+
+  .fp-list {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 220px;
+    margin: 0;
+    padding: 5px;
+    list-style: none;
+    background: var(--ink-card);
+    border: 1px solid var(--haze-soft);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+  .fp-opt {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--moon);
+    cursor: pointer;
+    text-align: left;
+  }
+  .fp-opt:hover {
+    background: var(--haze-soft);
+  }
+  .fp-opt.sel {
+    background: var(--haze);
+  }
+  .fp-opt-name {
+    font-size: 17px;
+    line-height: 1.2;
+  }
+  .fp-opt-kind {
+    flex: none;
+    color: var(--dimmer);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 </style>

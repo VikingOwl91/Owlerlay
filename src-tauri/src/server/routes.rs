@@ -3,11 +3,13 @@ use crate::countdown::commands::build_snapshot_dtos;
 use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::events::AppEvent;
 use crate::countdown::model::CountdownState;
-use crate::overlay::model::OverlayConfig;
+use crate::overlay::model::{OverlayConfig, TimeFormat};
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::http::header;
 use axum::response::Html;
+use axum::response::IntoResponse;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use minijinja::{Environment, Value, context};
 use serde::{Deserialize, Serialize};
@@ -35,6 +37,7 @@ struct CountdownView {
     remaining: String,
     percent: f32,
     font_size: f32,
+    font_family: String,
     text_color: String,
     divider_color: String,
     bar_bg: String,
@@ -56,9 +59,10 @@ impl CountdownView {
             icon: config.icon.clone(),
             show_timer: config.show_timer,
             show_progress: config.show_progress,
-            remaining: format_remaining(snap.duration as u64, config.show_hh_mm),
+            remaining: config.time_format.format(snap.duration as u64),
             percent: percent_of(snap.duration, snap.initial_duration),
             font_size: config.font_size,
+            font_family: config.font_family.clone(),
             text_color: config.text_color.clone(),
             divider_color: config.divider_color.clone(),
             bar_bg: config.bar_bg.clone(),
@@ -78,7 +82,7 @@ impl CountdownView {
 pub async fn overlay_group(
     State(state): State<Arc<AppState>>,
     Query(q): Query<OverlayQuery>,
-) -> Result<Html<String>, (StatusCode, String)> {
+) -> Result<impl IntoResponse, (StatusCode, String)> {
     let group = state.overlay_service.get_group(q.group).await.ok_or((
         StatusCode::NOT_FOUND,
         format!("overlay group {} not found", q.group),
@@ -126,7 +130,9 @@ pub async fn overlay_group(
         })
         .map_err(internal)?;
 
-    Ok(Html(html))
+    // No caching: a config/membership change fires a `reload`, and the browser
+    // must re-fetch the freshly rendered page instead of serving a stale copy.
+    Ok(([(header::CACHE_CONTROL, "no-store")], Html(html)))
 }
 
 /// Live updates for a group's countdowns. Emits `countdown-tick` (JSON
@@ -153,11 +159,11 @@ pub async fn sse_group(
         .filter(|s| members.contains(&s.id))
         .map(|s| (s.id, s.initial_duration))
         .collect();
-    let mut formats: HashMap<u64, bool> = HashMap::new();
+    let mut formats: HashMap<u64, TimeFormat> = HashMap::new();
     for member in &members {
         formats.insert(
             *member,
-            state.overlay_service.get_config(*member).await.show_hh_mm,
+            state.overlay_service.get_config(*member).await.time_format,
         );
     }
 
@@ -165,10 +171,10 @@ pub async fn sse_group(
     let stream = BroadcastStream::new(rx).filter_map(move |event| match event {
         Ok(AppEvent::Tick(p)) if members.contains(&p.id) => {
             let initial = initials.get(&p.id).copied().unwrap_or(0);
-            let show_hh_mm = formats.get(&p.id).copied().unwrap_or(false);
+            let fmt = formats.get(&p.id).copied().unwrap_or_default();
             let data = serde_json::json!({
                 "id": p.id,
-                "remaining": format_remaining(p.remaining_ms, show_hh_mm),
+                "remaining": fmt.format(p.remaining_ms),
                 "percent": percent_of(p.remaining_ms as u128, initial),
             });
             Some(Ok(Event::default()
@@ -262,12 +268,3 @@ fn percent_of(remaining_ms: u128, initial_ms: u128) -> f32 {
     }
 }
 
-fn format_remaining(ms: u64, show_hh_mm: bool) -> String {
-    if !show_hh_mm {
-        return (ms / 1_000).to_string();
-    }
-    let h = ms / 3_600_000;
-    let m = (ms % 3_600_000) / 60_000;
-    let s = (ms % 60_000) / 1_000;
-    format!("{h:02}:{m:02}:{s:02}")
-}

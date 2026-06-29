@@ -1,21 +1,24 @@
 const hideIdle = {{ hide_idle | lower }};
 const es = new EventSource('/sse/group/{{ id }}');
+
 es.addEventListener('countdown-tick', e => {
-  const {id, remaining, percent} = JSON.parse(e.data);
+  const { id, remaining, percent } = JSON.parse(e.data);
   const timer = document.getElementById('timer-' + id);
-  if(timer){
-    timer.textContent = remaining;
-  }
-  const progressInner = document.getElementById('progress-inner-' + id);
-  if(progressInner){
-    progressInner.style.width = percent + '%';
-  }
+  if (timer) timer.textContent = remaining;
+  const fill = document.getElementById('progress-inner-' + id);
+  if (fill) fill.style.width = percent + '%';
 });
+
 es.addEventListener('countdown-state', e => {
-  const {id, state} = JSON.parse(e.data);
-  if (hideIdle) {
-    document.getElementById('countdown-' + id).dataset.hidden = state === 'Idle';
-  }
+  if (!hideIdle) return;
+  const { id, state } = JSON.parse(e.data);
+  const item = document.getElementById('countdown-' + id);
+  if (item) item.dataset.hidden = state === 'Idle';
 });
+
+// Structural changes (membership/config) re-render the page server-side.
 es.addEventListener('reload', () => location.reload());
-es.onerror = () => setTimeout(() => location.reload(), 3000);
+
+// Transient drops are handled by EventSource's own reconnect — don't reload on
+// error. The blind reload-on-error loop could storm Firefox's per-host
+// connection cap into a blank page.

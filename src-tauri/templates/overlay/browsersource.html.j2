@@ -3,16 +3,59 @@
   <head>
   <meta charset="UTF-8">
   <style>
+      /* Bundled timer fonts, served from public/ (/static), so every OBS
+         machine renders the chosen family identically regardless of what's
+         installed locally. Variable woff2 (weight axis) — one file per family
+         covers all weights. To add a face later: drop the woff2 in
+         public/fonts/, add an @font-face here, and a FONTS entry in the
+         control UI's AppearancePanel. */
+      @font-face { font-family: "Spline Sans Mono"; font-weight: 100 900; font-display: swap; src: url("/static/fonts/spline-sans-mono.woff2") format("woff2"); }
+      @font-face { font-family: "Hanken Grotesk"; font-weight: 100 900; font-display: swap; src: url("/static/fonts/hanken-grotesk.woff2") format("woff2"); }
+      @font-face { font-family: "Bricolage Grotesque"; font-weight: 200 800; font-display: swap; src: url("/static/fonts/bricolage-grotesque.woff2") format("woff2"); }
+      @font-face { font-family: "Quicksand"; font-weight: 300 700; font-display: swap; src: url("/static/fonts/quicksand.woff2") format("woff2"); }
+      @font-face { font-family: "Fraunces"; font-weight: 100 900; font-display: swap; src: url("/static/fonts/fraunces.woff2") format("woff2"); }
       body {
         background: transparent;
         margin: 0;
         padding: 0;
+        overflow: hidden;
+        font-family: "Spline Sans Mono", ui-monospace, "JetBrains Mono",
+          "SF Mono", Menlo, Consolas, monospace;
       }
+      /* Structural rules shared by every countdown; per-widget config (colours,
+         sizes, borders) is appended below as id-scoped rules. */
+      .countdown-item { align-self: center; text-align: center; }
+      .countdown-item[data-hidden="true"] { display: none; }
+      .cd-stack {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.45rem;
+        /* widen the bar/divider a touch past the digits */
+        padding: 0 0.5rem;
+      }
+      .cd-readout {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        line-height: 1;
+      }
+      .cd-icon { object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)); }
+      .cd-timer {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55), 0 0 2px rgba(0, 0, 0, 0.85);
+      }
+      .cd-divider { width: 100%; height: 1px; border: 0; margin: 0; opacity: 0.55; }
+      .cd-track { width: 100%; height: 0.5rem; border-radius: 999px; overflow: hidden; }
+      .cd-fill { height: 100%; border-radius: inherit; transition: width 0.25s linear; }
       {{ source_style }}
   </style>
   </head>
   <body>
-      <div id="group" style="display: flex; flex-direction: {{ layout }};">
+      <div id="group" style="display: flex; flex-direction: {{ layout }}; gap: 0.75rem;">
         {{ content }}
     </div>
   <script>

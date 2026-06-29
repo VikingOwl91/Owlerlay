@@ -19,6 +19,47 @@ impl Layout {
     }
 }
 
+/// How the overlay renders a countdown's remaining time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TimeFormat {
+    /// Smallest grouping that fits — strips leading all-zero units: ≥1d shows
+    /// days, ≥1h shows H:M:S, ≥1m shows M:S, else just seconds.
+    #[default]
+    Auto,
+    /// `DD:HH:MM:SS`
+    Dhms,
+    /// `HH:MM:SS` (hours may exceed 24)
+    Hms,
+    /// `MM:SS` (minutes may exceed 59)
+    Ms,
+    /// Total remaining seconds.
+    S,
+}
+
+impl TimeFormat {
+    /// Render `ms` of remaining time per this format. Fixed-grouping modes let
+    /// the leading unit overflow (e.g. `MM:SS` of 2h is `120:00`); `Auto` strips
+    /// leading all-zero groups, padding the rest.
+    pub fn format(self, ms: u64) -> String {
+        let total = ms / 1_000;
+        let s = total % 60;
+        let m = (total / 60) % 60;
+        let h = (total / 3_600) % 24;
+        let d = total / 86_400;
+        match self {
+            TimeFormat::S => total.to_string(),
+            TimeFormat::Ms => format!("{:02}:{s:02}", total / 60),
+            TimeFormat::Hms => format!("{:02}:{m:02}:{s:02}", total / 3_600),
+            TimeFormat::Dhms => format!("{d:02}:{h:02}:{m:02}:{s:02}"),
+            TimeFormat::Auto if d > 0 => format!("{d:02}:{h:02}:{m:02}:{s:02}"),
+            TimeFormat::Auto if h > 0 => format!("{h:02}:{m:02}:{s:02}"),
+            TimeFormat::Auto if m > 0 => format!("{m:02}:{s:02}"),
+            TimeFormat::Auto => format!("{s:02}"),
+        }
+    }
+}
+
 /// A named group of countdowns rendered together as a single OBS browser source.
 ///
 /// Styling lives per countdown ([`OverlayConfig`]); the group only owns the
@@ -45,6 +86,9 @@ pub struct OverlayConfig {
     pub show_progress: bool,
     /// Timer font size, in `rem`.
     pub font_size: f32,
+    /// CSS `font-family` stack for the timer. `"inherit"` keeps the page's
+    /// default mono face; the control UI sends a curated stack per widget.
+    pub font_family: String,
     pub text_color: String,
     pub background: String,
     pub border: String,
@@ -57,7 +101,7 @@ pub struct OverlayConfig {
     pub divider_color: String,
     pub bar_bg: String,
     pub bar_fg: String,
-    pub show_hh_mm: bool,
+    pub time_format: TimeFormat,
 }
 
 impl Default for OverlayConfig {
@@ -67,6 +111,7 @@ impl Default for OverlayConfig {
             show_timer: true,
             show_progress: false,
             font_size: 2.0,
+            font_family: "inherit".to_string(),
             text_color: "white".to_string(),
             background: "transparent".to_string(),
             border: "none".to_string(),
@@ -77,7 +122,7 @@ impl Default for OverlayConfig {
             divider_color: "white".to_string(),
             bar_bg: "#333".to_string(),
             bar_fg: "#4ade80".to_string(),
-            show_hh_mm: false,
+            time_format: TimeFormat::Auto,
         }
     }
 }
