@@ -9,6 +9,12 @@ export function formatDuration(duration: Duration): string {
   return `${duration.hours.toString().padStart(2, "0")}:${duration.minutes.toString().padStart(2, "0")}:${duration.seconds.toString().padStart(2, "0")}.${duration.millis.toString().padStart(3, "0")}`;
 }
 
+/** `HH:MM:SS` without millis — for clock-style displays (rail, broadcast readout). */
+export function formatClock(duration: Duration): string {
+  const p = (n: number) => n.toString().padStart(2, "0");
+  return `${p(duration.hours)}:${p(duration.minutes)}:${p(duration.seconds)}`;
+}
+
 export function millisToDuration(millis: number): Duration {
   return {
     hours: Math.floor(millis / 3600000),
