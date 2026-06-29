@@ -19,6 +19,24 @@ impl Layout {
     }
 }
 
+/// How the overlay renders a countdown's remaining time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TimeFormat {
+    /// Smallest grouping that fits — strips leading all-zero units: ≥1d shows
+    /// days, ≥1h shows H:M:S, ≥1m shows M:S, else just seconds.
+    #[default]
+    Auto,
+    /// `DD:HH:MM:SS`
+    Dhms,
+    /// `HH:MM:SS` (hours may exceed 24)
+    Hms,
+    /// `MM:SS` (minutes may exceed 59)
+    Ms,
+    /// Total remaining seconds.
+    S,
+}
+
 /// A named group of countdowns rendered together as a single OBS browser source.
 ///
 /// Styling lives per countdown ([`OverlayConfig`]); the group only owns the
@@ -60,7 +78,7 @@ pub struct OverlayConfig {
     pub divider_color: String,
     pub bar_bg: String,
     pub bar_fg: String,
-    pub show_hh_mm: bool,
+    pub time_format: TimeFormat,
 }
 
 impl Default for OverlayConfig {
@@ -81,7 +99,7 @@ impl Default for OverlayConfig {
             divider_color: "white".to_string(),
             bar_bg: "#333".to_string(),
             bar_fg: "#4ade80".to_string(),
-            show_hh_mm: false,
+            time_format: TimeFormat::Auto,
         }
     }
 }

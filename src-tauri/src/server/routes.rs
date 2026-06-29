@@ -3,7 +3,7 @@ use crate::countdown::commands::build_snapshot_dtos;
 use crate::countdown::dto::CountdownSnapshotDto;
 use crate::countdown::events::AppEvent;
 use crate::countdown::model::CountdownState;
-use crate::overlay::model::OverlayConfig;
+use crate::overlay::model::{OverlayConfig, TimeFormat};
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -59,7 +59,7 @@ impl CountdownView {
             icon: config.icon.clone(),
             show_timer: config.show_timer,
             show_progress: config.show_progress,
-            remaining: format_remaining(snap.duration as u64, config.show_hh_mm),
+            remaining: format_remaining(snap.duration as u64, config.time_format),
             percent: percent_of(snap.duration, snap.initial_duration),
             font_size: config.font_size,
             font_family: config.font_family.clone(),
@@ -159,11 +159,11 @@ pub async fn sse_group(
         .filter(|s| members.contains(&s.id))
         .map(|s| (s.id, s.initial_duration))
         .collect();
-    let mut formats: HashMap<u64, bool> = HashMap::new();
+    let mut formats: HashMap<u64, TimeFormat> = HashMap::new();
     for member in &members {
         formats.insert(
             *member,
-            state.overlay_service.get_config(*member).await.show_hh_mm,
+            state.overlay_service.get_config(*member).await.time_format,
         );
     }
 
@@ -171,10 +171,10 @@ pub async fn sse_group(
     let stream = BroadcastStream::new(rx).filter_map(move |event| match event {
         Ok(AppEvent::Tick(p)) if members.contains(&p.id) => {
             let initial = initials.get(&p.id).copied().unwrap_or(0);
-            let show_hh_mm = formats.get(&p.id).copied().unwrap_or(false);
+            let fmt = formats.get(&p.id).copied().unwrap_or_default();
             let data = serde_json::json!({
                 "id": p.id,
-                "remaining": format_remaining(p.remaining_ms, show_hh_mm),
+                "remaining": format_remaining(p.remaining_ms, fmt),
                 "percent": percent_of(p.remaining_ms as u128, initial),
             });
             Some(Ok(Event::default()
@@ -268,12 +268,49 @@ fn percent_of(remaining_ms: u128, initial_ms: u128) -> f32 {
     }
 }
 
-fn format_remaining(ms: u64, show_hh_mm: bool) -> String {
-    if !show_hh_mm {
-        return (ms / 1_000).to_string();
+/// Render `ms` of remaining time per the chosen [`TimeFormat`]. Fixed-grouping
+/// modes let the leading unit overflow (e.g. `MM:SS` of 2h is `120:00`); `Auto`
+/// strips leading all-zero groups, padding the rest.
+fn format_remaining(ms: u64, fmt: TimeFormat) -> String {
+    let total = ms / 1_000;
+    let s = total % 60;
+    let m = (total / 60) % 60;
+    let h = (total / 3_600) % 24;
+    let d = total / 86_400;
+    match fmt {
+        TimeFormat::S => total.to_string(),
+        TimeFormat::Ms => format!("{:02}:{s:02}", total / 60),
+        TimeFormat::Hms => format!("{:02}:{m:02}:{s:02}", total / 3_600),
+        TimeFormat::Dhms => format!("{d:02}:{h:02}:{m:02}:{s:02}"),
+        TimeFormat::Auto if d > 0 => format!("{d:02}:{h:02}:{m:02}:{s:02}"),
+        TimeFormat::Auto if h > 0 => format!("{h:02}:{m:02}:{s:02}"),
+        TimeFormat::Auto if m > 0 => format!("{m:02}:{s:02}"),
+        TimeFormat::Auto => format!("{s:02}"),
     }
-    let h = ms / 3_600_000;
-    let m = (ms % 3_600_000) / 60_000;
-    let s = (ms % 60_000) / 1_000;
-    format!("{h:02}:{m:02}:{s:02}")
+}
+
+#[cfg(test)]
+mod format_tests {
+    use super::*;
+
+    fn f(secs: u64, fmt: TimeFormat) -> String {
+        format_remaining(secs * 1_000, fmt)
+    }
+
+    #[test]
+    fn auto_strips_leading_zero_groups() {
+        assert_eq!(f(9, TimeFormat::Auto), "09");
+        assert_eq!(f(65, TimeFormat::Auto), "01:05");
+        assert_eq!(f(3_903, TimeFormat::Auto), "01:05:03");
+        assert_eq!(f(183_950, TimeFormat::Auto), "02:03:05:50");
+        assert_eq!(f(0, TimeFormat::Auto), "00");
+    }
+
+    #[test]
+    fn fixed_modes_let_the_leading_unit_overflow() {
+        assert_eq!(f(3_903, TimeFormat::S), "3903");
+        assert_eq!(f(7_200, TimeFormat::Ms), "120:00");
+        assert_eq!(f(180_000, TimeFormat::Hms), "50:00:00");
+        assert_eq!(f(183_950, TimeFormat::Dhms), "02:03:05:50");
+    }
 }

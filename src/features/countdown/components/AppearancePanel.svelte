@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { setOverlayConfig } from "../api/countdown.client";
-  import type { OverlayConfig } from "../model/countdown.types";
+  import type { OverlayConfig, TimeFormat } from "../model/countdown.types";
   import { OVERLAY_SERVER_ORIGIN } from "../../../shared/overlay/origin";
 
   let { id }: { id: number } = $props();
@@ -86,8 +86,17 @@
     barFg: string;
     barBg: string;
     dividerColor: string;
-    showHHMM: boolean;
+    timeFormat: TimeFormat;
   };
+
+  // Label each time format by what it shows, with an example.
+  const TIME_FORMATS: { value: TimeFormat; label: string }[] = [
+    { value: "auto", label: "Auto · 05:03" },
+    { value: "dhms", label: "DD:HH:MM:SS" },
+    { value: "hms", label: "HH:MM:SS" },
+    { value: "ms", label: "MM:SS" },
+    { value: "s", label: "Seconds" },
+  ];
 
   const DEFAULT_SETTINGS: OverlaySettings = {
     icon: "",
@@ -107,7 +116,7 @@
     barFg: "#4ade80",
     barBg: "#333333",
     dividerColor: "#ffffff",
-    showHHMM: false,
+    timeFormat: "auto",
   };
 
   function toConfig(s: OverlaySettings): OverlayConfig {
@@ -130,7 +139,7 @@
       dividerColor: s.dividerColor,
       barBg: s.barBg,
       barFg: s.barFg,
-      showHhMm: s.showHHMM,
+      timeFormat: s.timeFormat,
     };
   }
 
@@ -199,14 +208,18 @@
         />
       </div>
       <div class="field">
-        <label for="ap-hhmm">Show HH:MM</label>
-        <input
-          id="ap-hhmm"
-          type="checkbox"
-          class="toggle"
-          checked={s.showHHMM}
-          onchange={(e) => set({ showHHMM: e.currentTarget.checked })}
-        />
+        <label for="ap-tf">Time format</label>
+        <select
+          id="ap-tf"
+          class="select"
+          value={s.timeFormat}
+          onchange={(e) =>
+            set({ timeFormat: e.currentTarget.value as TimeFormat })}
+        >
+          {#each TIME_FORMATS as fmt (fmt.value)}
+            <option value={fmt.value}>{fmt.label}</option>
+          {/each}
+        </select>
       </div>
       <div class="field">
         <label for="ap-tc">Text colour</label>
@@ -560,6 +573,16 @@
   .lbl {
     color: var(--dim);
     font-size: 13.5px;
+  }
+
+  .select {
+    font-size: 13.5px;
+    background: var(--ink);
+    border: 1px solid var(--haze-soft);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--moon);
+    cursor: pointer;
   }
 
   .fontpick {

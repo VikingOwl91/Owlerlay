@@ -55,6 +55,9 @@ export type CountdownTickPayload = {
   remaining_ms: number;
 };
 
+/** Mirrors the Rust `TimeFormat` enum (serde lowercase). */
+export type TimeFormat = "auto" | "dhms" | "hms" | "ms" | "s";
+
 /** Mirrors the Rust `OverlayConfig` struct (serde `camelCase`). */
 export type OverlayConfig = {
   icon: string;
@@ -72,7 +75,7 @@ export type OverlayConfig = {
   dividerColor: string;
   barBg: string;
   barFg: string;
-  showHhMm: boolean;
+  timeFormat: TimeFormat;
 };
 
 export type OverlayConfigPayload = {
