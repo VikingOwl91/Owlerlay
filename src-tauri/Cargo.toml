@@ -1,6 +1,6 @@
 [package]
 name = "owlerlay"
-version = "0.1.0"
+version = "0.2.0"
 description = "Owlerlay — an OBS overlay control center for streamers"
 authors = ["s0wlz"]
 edition = "2024"
