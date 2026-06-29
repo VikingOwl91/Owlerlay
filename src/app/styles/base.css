@@ -1,16 +1,115 @@
-:root {
-  --pico-border-radius: 0.5rem;
-  --pico-typography-spacing-vertical: 1.5rem;
-  --pico-form-element-spacing-vertical: 1rem;
-  --pico-form-element-spacing-horizontal: 1.25rem;
+/* Reset + base element styling for the bespoke system (no framework). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-h1 {
-  --pico-font-family: Pacifico, cursive;
-  --pico-font-weight: 400;
-  --pico-typography-spacing-vertical: 0.5rem;
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--moon);
+  background:
+    radial-gradient(1200px 600px at 78% -10%, #2a2140 0%, transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, #1d1830 0%, transparent 55%),
+    var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden; /* the app shell owns its own scroll regions */
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
 }
 
 button {
-  --pico-font-weight: 700;
+  cursor: pointer;
+}
+
+a {
+  color: var(--eye);
+  text-decoration: none;
+}
+
+/* visible keyboard focus everywhere — quality floor */
+:focus-visible {
+  outline: 2px solid var(--eye);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* dusk-toned scrollbars so they don't read as default-OS chrome */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--haze) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--haze);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* shared "awake" animations — the owl-eye pulse and clock blink */
+@keyframes owl-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes owl-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

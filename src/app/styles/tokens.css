@@ -1,0 +1,41 @@
+/* Owlerlay design tokens — "Night-Owl Control Room" (Dusk & Tawny).
+   The one source of truth for colour, type, radius and glow. */
+:root {
+  /* surfaces — twilight, not black */
+  --ink: #15121e;
+  --ink-raised: #211b30;
+  --ink-card: #261f37;
+  --haze: #342c4b;
+  --haze-soft: #2a2340;
+
+  /* text */
+  --moon: #efeaf4;
+  --dim: #9d94ae;
+  --dimmer: #6f6885;
+
+  /* owl-eye accent + plumage */
+  --eye: #ffb23e;
+  --eye-bright: #ffd089;
+  --talon: #c9743e;
+
+  /* state machine: idle=asleep, running=eye, paused=cool, finished=moon */
+  --st-idle: #463f5c;
+  --st-running: var(--eye);
+  --st-paused: #8fa0e6;
+  --st-finished: var(--moon);
+
+  /* type */
+  --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-body: "Hanken Grotesk Variable", system-ui, sans-serif;
+  --font-mono: "Spline Sans Mono Variable", ui-monospace, monospace;
+
+  /* radius */
+  --r-card: 16px;
+  --r-input: 10px;
+  --r-pill: 999px;
+
+  /* the amber glow that marks "awake / live" */
+  --glow: 0 0 24px -4px rgba(255, 178, 62, 0.45);
+  --glow-strong:
+    0 0 32px rgba(255, 178, 62, 0.4), 0 0 4px rgba(255, 178, 62, 0.5);
+}

@@ -12,6 +12,7 @@ export function mapSnapshotDtoToSnapshot(
     id: snapshotDto.id,
     label: snapshotDto.label,
     duration: duration,
+    initialDuration: millisToDuration(snapshotDto.initial_duration),
     state: snapshotDto.state,
     start_epoch:
       snapshotDto.start_epoch_ms !== null

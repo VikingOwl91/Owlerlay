@@ -17,6 +17,7 @@ export type CountdownSnapshot = {
   id: number;
   label: string;
   duration: Duration;
+  initialDuration: Duration;
   state: CountdownState;
   start_epoch: Date | null;
   target_epoch: Date | null;
