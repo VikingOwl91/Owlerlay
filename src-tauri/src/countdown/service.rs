@@ -56,34 +56,36 @@ fn restore_countdown(dto: CountdownSnapshotDto, now: Instant, now_epoch_ms: u128
             None,
         ),
         CountdownState::Running => {
-            // Remaining wall-clock until the persisted target. If it already
-            // elapsed (or there's no target), boot it Finished.
+            // Remaining wall-clock until the persisted target, clamped to the
+            // configured length: a countdown can never have more time left than
+            // it started with, so this caps a backward clock change (between save
+            // and restore) inflating the value, and keeps the `as u64` cast safe.
             let remaining_ms = dto
                 .target_epoch_ms
                 .map(|t| t.saturating_sub(now_epoch_ms))
-                .unwrap_or(0);
-            if remaining_ms == 0 {
-                Countdown::restore(
+                .unwrap_or(0)
+                .min(dto.initial_duration);
+            // ponytail: start_timestamp is approximated as `now`. The model never
+            // reads it (only target drives remaining_at); it's cosmetic in snaps.
+            match now.checked_add(Duration::from_millis(remaining_ms as u64)) {
+                Some(target) if remaining_ms > 0 => Countdown::restore(
+                    dto.label,
+                    initial,
+                    CountdownState::Running,
+                    None,
+                    Some(now),
+                    Some(target),
+                ),
+                // Elapsed during downtime, or a target so far out it overflows the
+                // monotonic clock → boot it Finished rather than panic.
+                _ => Countdown::restore(
                     dto.label,
                     initial,
                     CountdownState::Finished,
                     Some(Duration::from_secs(0)),
                     None,
                     None,
-                )
-            } else {
-                let remaining = Duration::from_millis(remaining_ms as u64);
-                // ponytail: start_timestamp is approximated as `now`. The model
-                // never reads it (only target drives remaining_at); it's purely
-                // cosmetic in snapshots.
-                Countdown::restore(
-                    dto.label,
-                    initial,
-                    CountdownState::Running,
-                    None,
-                    Some(now),
-                    Some(now + remaining),
-                )
+                ),
             }
         }
     }
@@ -111,7 +113,11 @@ impl CountdownService {
     /// colliding with a restored id).
     pub fn from_dtos(dtos: Vec<CountdownSnapshotDto>, now_epoch_ms: u128) -> Self {
         let now = Instant::now();
-        let next_id = dtos.iter().map(|d| d.id + 1).max().unwrap_or(0);
+        let next_id = dtos
+            .iter()
+            .map(|d| d.id)
+            .max()
+            .map_or(0, |m| m.saturating_add(1));
         let mut countdowns = HashMap::with_capacity(dtos.len());
         for dto in dtos {
             countdowns.insert(dto.id, restore_countdown(dto, now, now_epoch_ms));

@@ -239,6 +239,10 @@ pub(crate) fn spawn_ticker(app: AppHandle) {
             if !result.newly_finished.is_empty()
                 && let Ok(snapshots) = build_snapshot_dtos(&state).await
             {
+                // Persist the natural finish: this is the one state transition
+                // not driven by a user action, so without this the store keeps
+                // a stale `Running` entry until the next mutation.
+                let _ = crate::countdown::store::save(&app, &snapshots);
                 // Desktop app: refresh the list so finished countdowns show
                 // their new state.
                 let _ = app.emit("countdown_changed", &snapshots);

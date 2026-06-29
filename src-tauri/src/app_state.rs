@@ -60,8 +60,7 @@ impl AppState {
         // Anchor first, then restore countdowns against its boot wall-clock so
         // running timers keep counting across the restart.
         let clock_anchor = ClockAnchor::new();
-        let countdown_service =
-            CountdownService::from_dtos(persisted, clock_anchor.boot_epoch_ms);
+        let countdown_service = CountdownService::from_dtos(persisted, clock_anchor.boot_epoch_ms);
         Self {
             clock_anchor,
             countdown_service,

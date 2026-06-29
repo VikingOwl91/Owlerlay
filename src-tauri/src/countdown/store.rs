@@ -35,14 +35,19 @@ pub fn load(handle: &AppHandle) -> Vec<CountdownSnapshotDto> {
 
 /// Persist the current countdowns. Best-effort: callers ignore the result so a
 /// transient IO error never blocks a timer action.
-// ponytail: plain write (not atomic), matching settings.rs. A crash mid-write
-// corrupts the file, but load() falls back to empty. Upgrade to temp+rename if
-// that ever bites.
 pub fn save(handle: &AppHandle, snapshots: &[CountdownSnapshotDto]) -> io::Result<()> {
     let path = store_path(handle)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let json = serde_json::to_string_pretty(snapshots).map_err(io::Error::other)?;
-    std::fs::write(&path, json)
+    // Atomic write: the desktop IPC and the LAN remote can both reach save()
+    // concurrently, and a crash can land mid-write. Write a sibling temp file
+    // then rename (atomic on the same filesystem) so the real file is always a
+    // complete previous-or-new version, never a half-written one load() discards.
+    // ponytail: both writers share one .tmp path; the rare overlap self-heals via
+    // load()'s empty fallback. Give the temp a unique suffix if that ever bites.
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, json)?;
+    std::fs::rename(&tmp, &path)
 }

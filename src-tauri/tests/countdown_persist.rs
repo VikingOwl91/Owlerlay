@@ -91,6 +91,37 @@ async fn next_id_avoids_collision_with_restored_ids() {
 }
 
 #[tokio::test]
+async fn running_remaining_is_clamped_to_initial() {
+    // A backward clock change (or a hand-edited far-future target) makes the
+    // raw target-vs-now delta exceed the configured length; restore must clamp
+    // it so the overlay can't show more time left than the countdown started
+    // with — and must never panic on the overflowing instant.
+    let dtos = vec![dto(
+        1,
+        CountdownState::Running,
+        INITIAL_MS,
+        Some(NOW_EPOCH_MS + 10 * INITIAL_MS), // 10x the configured length out
+    )];
+    let service = CountdownService::from_dtos(dtos, NOW_EPOCH_MS);
+    let snaps = service.list_countdown().await.expect("list");
+    let s = &snaps[0];
+    assert_eq!(s.state, CountdownState::Running);
+    assert!(
+        s.duration <= Duration::from_millis(INITIAL_MS as u64),
+        "remaining must be clamped to initial, got {:?}",
+        s.duration
+    );
+}
+
+#[tokio::test]
+async fn next_id_does_not_overflow_on_max_id() {
+    // A corrupt/hand-edited store with id == u64::MAX must not panic on restore.
+    let dtos = vec![dto(u64::MAX, CountdownState::Idle, INITIAL_MS, None)];
+    let service = CountdownService::from_dtos(dtos, NOW_EPOCH_MS);
+    assert_eq!(service.list_countdown().await.expect("list").len(), 1);
+}
+
+#[tokio::test]
 async fn empty_store_restores_empty_service() {
     let service = CountdownService::from_dtos(Vec::new(), NOW_EPOCH_MS);
     assert!(service.list_countdown().await.expect("list").is_empty());
